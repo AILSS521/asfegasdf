@@ -264,8 +264,23 @@ export class MultiThreadDownloader extends EventEmitter {
     try {
       await Promise.all(downloadPromises)
 
+      // 如果被暂停或取消，不继续处理
       if (this.isAborted) {
         await this.cleanup()
+        return
+      }
+
+      if (this.isPaused) {
+        // 暂停状态，不合并文件，等待恢复
+        this.stopProgressTimer()
+        return
+      }
+
+      // 检查是否所有分片都已完成
+      const allCompleted = this.chunks.every(c => c.status === 'completed')
+      if (!allCompleted) {
+        // 有分片未完成，可能是暂停导致的
+        this.stopProgressTimer()
         return
       }
 
