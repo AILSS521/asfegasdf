@@ -177,6 +177,7 @@ async function deleteTask(id: string) {
     } catch (e) {
       // ignore
     }
+    task.error = '已取消'
     downloadStore.moveToCompleted(task, false)
   }
   selectedIds.value.delete(id)

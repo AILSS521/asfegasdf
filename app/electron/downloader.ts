@@ -360,12 +360,24 @@ export class MultiThreadDownloader extends EventEmitter {
 
         res.on('error', (err) => {
           fileStream.close()
+          // 如果是暂停或取消导致的错误，直接 resolve
+          if (this.isPaused || this.isAborted) {
+            this.activeRequests.delete(chunk.index)
+            resolve()
+            return
+          }
           this.handleChunkError(chunk, err, resolve, reject)
         })
       })
 
       req.on('error', (err) => {
         fileStream.close()
+        // 如果是暂停或取消导致的错误，直接 resolve
+        if (this.isPaused || this.isAborted) {
+          this.activeRequests.delete(chunk.index)
+          resolve()
+          return
+        }
         this.handleChunkError(chunk, err, resolve, reject)
       })
 
@@ -499,6 +511,7 @@ export class MultiThreadDownloader extends EventEmitter {
   async resume() {
     if (!this.isPaused) return
     this.isPaused = false
+    this.isAborted = false // 确保 isAborted 也重置
 
     // 重新下载未完成的分片
     const pendingChunks = this.chunks.filter(c => c.status !== 'completed')
@@ -508,11 +521,31 @@ export class MultiThreadDownloader extends EventEmitter {
         const promises = pendingChunks.map(chunk => this.downloadChunk(chunk))
         await Promise.all(promises)
 
-        if (!this.isAborted && !this.isPaused) {
-          await this.mergeChunks()
+        // 再次检查暂停/取消状态
+        if (this.isAborted) {
           this.stopProgressTimer()
-          this.emitProgress('completed')
+          await this.cleanup()
+          return
         }
+
+        if (this.isPaused) {
+          // 暂停状态，不合并文件，等待恢复
+          this.stopProgressTimer()
+          return
+        }
+
+        // 检查是否所有分片都已完成
+        const allCompleted = this.chunks.every(c => c.status === 'completed')
+        if (!allCompleted) {
+          // 有分片未完成，可能是暂停导致的
+          this.stopProgressTimer()
+          return
+        }
+
+        // 所有分片完成，合并文件
+        await this.mergeChunks()
+        this.stopProgressTimer()
+        this.emitProgress('completed')
       } catch (error: any) {
         this.stopProgressTimer()
         this.emitProgress('error', error.message)
@@ -522,16 +555,26 @@ export class MultiThreadDownloader extends EventEmitter {
       // 因为单线程下载没有分片信息，暂停后无法断点续传
       // 发送错误提示
       this.emitProgress('error', '单线程下载不支持断点续传，请重新下载')
+    } else {
+      // 所有分片已完成，直接合并
+      try {
+        await this.mergeChunks()
+        this.emitProgress('completed')
+      } catch (error: any) {
+        this.emitProgress('error', error.message)
+      }
     }
   }
 
   // 取消下载
   async abort() {
     this.isAborted = true
+    this.isPaused = false
     this.stopProgressTimer()
     this.activeRequests.forEach(req => req.destroy())
     this.activeRequests.clear()
     await this.cleanup()
+    // 取消时不发送任何状态，由前端处理
   }
 
   // 获取任务ID
