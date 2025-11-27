@@ -151,8 +151,8 @@ const downloadStore = useDownloadStore()
 
 const code = ref('')
 const fileList = ref<FileItem[]>([])
-const currentPath = ref('/')
-const basePath = ref('/') // 首次获取文件列表时的路径，作为虚拟根目录
+const currentPath = ref('/') // 当前完整网盘路径
+const basePath = ref('/') // 首次获取文件列表时的根路径（用于显示转换和识别根目录）
 const loading = ref(false)
 const errorMessage = ref('')
 const hoverFileId = ref<number | string | null>(null)
@@ -160,7 +160,7 @@ const selectedIds = ref<Set<number | string>>(new Set())
 
 // 获取相对于基础路径的显示路径
 function getRelativePath(fullPath: string): string {
-  if (fullPath === basePath.value) return '/'
+  if (fullPath === basePath.value || fullPath === '/') return '/'
   if (fullPath.startsWith(basePath.value)) {
     const relativePath = fullPath.slice(basePath.value.length)
     return relativePath.startsWith('/') ? relativePath : '/' + relativePath
@@ -172,12 +172,15 @@ function getRelativePath(fullPath: string): string {
 const breadcrumbs = computed(() => {
   const relativePath = getRelativePath(currentPath.value)
   const parts = relativePath.split('/').filter(Boolean)
-  const items = [{ name: '根目录', path: basePath.value }]
 
-  let path = basePath.value
+  // 根目录用特殊标记 'ROOT'，实际导航时会转换为 basePath
+  const items = [{ name: '根目录', path: 'ROOT' }]
+
+  // 构建面包屑，path 存储的是完整网盘路径
+  let fullPath = basePath.value
   for (const part of parts) {
-    path = path === '/' ? '/' + part : path + '/' + part
-    items.push({ name: part, path })
+    fullPath = fullPath === '/' ? '/' + part : fullPath + '/' + part
+    items.push({ name: part, path: fullPath })
   }
 
   return items
@@ -189,6 +192,15 @@ const isAllSelected = computed(() => {
   return fileList.value.every(f => selectedIds.value.has(f.fs_id))
 })
 
+// 获取用于API请求的路径
+function getApiPath(fullPath: string): string {
+  // 如果是根目录（basePath），API 需要用 '/'
+  if (fullPath === basePath.value || fullPath === 'ROOT') {
+    return '/'
+  }
+  return fullPath
+}
+
 // 获取文件列表
 async function fetchFileList(isInitial: boolean = false) {
   if (!code.value.trim()) return
@@ -198,13 +210,15 @@ async function fetchFileList(isInitial: boolean = false) {
   selectedIds.value.clear()
 
   try {
-    const data = await api.getFileList(code.value.trim(), currentPath.value)
+    // 转换为 API 路径
+    const apiPath = getApiPath(currentPath.value)
+    const data = await api.getFileList(code.value.trim(), apiPath)
     fileList.value = data.list
 
     // 首次获取时，根据返回的文件路径自动确定基础路径
     if (isInitial && data.list.length > 0) {
       const firstFilePath = data.list[0].path
-      // 获取文件的父目录作为基础路径
+      // 获取文件的父目录作为基础路径（用于显示转换）
       const parentDir = firstFilePath.substring(0, firstFilePath.lastIndexOf('/')) || '/'
       basePath.value = parentDir
       currentPath.value = parentDir
@@ -240,7 +254,12 @@ async function handleFetch() {
 
 // 导航到目录
 async function navigateTo(path: string) {
-  currentPath.value = path
+  // ROOT 是特殊标记，表示根目录
+  if (path === 'ROOT') {
+    currentPath.value = basePath.value
+  } else {
+    currentPath.value = path
+  }
   await fetchFileList(false)
 }
 

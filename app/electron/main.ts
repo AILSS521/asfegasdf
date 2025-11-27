@@ -107,7 +107,7 @@ ipcMain.handle('download:start', (_, taskId: string, options: {
       savePath: options.savePath,
       filename: options.filename,
       userAgent: options.userAgent,
-      threads: 32
+      threads: 64
     })
     // 在后台启动下载，不阻塞 IPC 返回
     downloadManager.startTask(taskId).catch((error: Error) => {

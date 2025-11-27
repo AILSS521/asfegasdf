@@ -5,7 +5,7 @@ import * as https from 'https'
 import * as http from 'http'
 
 // 下载配置
-const DEFAULT_THREADS = 32 // 默认线程数
+const DEFAULT_THREADS = 64 // 默认线程数
 const MIN_CHUNK_SIZE = 1024 * 1024 // 最小分片 1MB
 const MAX_RETRIES = 3 // 最大重试次数
 const RETRY_DELAY = 2000 // 重试延迟 2秒
@@ -322,8 +322,15 @@ export class MultiThreadDownloader extends EventEmitter {
         res.pipe(fileStream)
 
         fileStream.on('finish', () => {
-          chunk.status = 'completed'
           this.activeRequests.delete(chunk.index)
+          // 只有当分片确实完整下载时才标记为完成
+          const expectedSize = chunk.end - chunk.start + 1
+          if (chunk.downloaded >= expectedSize) {
+            chunk.status = 'completed'
+          } else if (!this.isPaused && !this.isAborted) {
+            // 如果没有暂停/取消但下载不完整，标记为 pending 以便重试
+            chunk.status = 'pending'
+          }
           resolve()
         })
 
