@@ -58,3 +58,15 @@ export interface DownloadLinkResponse {
   urls: string[]
   ua: string
 }
+
+// 下载进度
+export interface DownloadProgress {
+  taskId: string
+  totalSize: number
+  downloadedSize: number
+  speed: number
+  progress: number
+  status: 'downloading' | 'paused' | 'completed' | 'error'
+  error?: string
+}
+

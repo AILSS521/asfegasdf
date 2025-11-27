@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { FileItem, DownloadTask, TaskStatus } from '@/types'
-import { useAria2 } from '@/composables/useAria2'
 
 export const useDownloadStore = defineStore('download', () => {
   // 状态
@@ -29,9 +28,6 @@ export const useDownloadStore = defineStore('download', () => {
   const activeDownloadCount = computed(() =>
     downloadingTasks.value.filter(t => t.status === 'downloading' || t.status === 'paused').length
   )
-
-  // aria2控制
-  const aria2 = useAria2()
 
   // 方法
   function setCurrentCode(code: string) {
@@ -97,9 +93,7 @@ export const useDownloadStore = defineStore('download', () => {
     const task = downloadingTasks.value.find(t => t.id === taskId)
     if (task) {
       task.status = 'paused'
-      if (task.gid) {
-        aria2.pause(task.gid)
-      }
+      window.electronAPI?.pauseDownload(taskId)
     }
   }
 
@@ -107,9 +101,7 @@ export const useDownloadStore = defineStore('download', () => {
     const task = downloadingTasks.value.find(t => t.id === taskId)
     if (task && task.status === 'paused') {
       task.status = 'downloading'
-      if (task.gid) {
-        aria2.unpause(task.gid)
-      }
+      window.electronAPI?.resumeDownload(taskId)
     }
   }
 

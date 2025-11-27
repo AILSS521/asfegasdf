@@ -2,22 +2,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useDownloadStore } from '@/stores/download'
 import { useSettingsStore } from '@/stores/settings'
 import { useApi } from './useApi'
-import type { DownloadTask } from '@/types'
+import type { DownloadProgress } from '@/types'
 import path from 'path-browserify'
 
 const MAX_CONCURRENT_DOWNLOADS = 3
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
-
-interface DownloadProgress {
-  taskId: string
-  totalSize: number
-  downloadedSize: number
-  speed: number
-  progress: number
-  status: 'downloading' | 'paused' | 'completed' | 'error'
-  error?: string
-}
 
 export function useDownloadManager() {
   const downloadStore = useDownloadStore()

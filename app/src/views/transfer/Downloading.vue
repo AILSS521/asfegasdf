@@ -134,10 +134,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDownloadStore } from '@/stores/download'
-import { useAria2 } from '@/composables/useAria2'
 
 const downloadStore = useDownloadStore()
-const aria2 = useAria2()
 
 const tasks = computed(() => downloadStore.downloadingTasks)
 const selectedIds = ref<Set<string>>(new Set())
@@ -173,14 +171,14 @@ function resumeTask(id: string) {
 
 async function deleteTask(id: string) {
   const task = tasks.value.find(t => t.id === id)
-  if (task?.gid) {
+  if (task) {
     try {
-      await aria2.forceRemove(task.gid)
+      await window.electronAPI?.cancelDownload(id)
     } catch (e) {
       // ignore
     }
+    downloadStore.moveToCompleted(task, false)
   }
-  downloadStore.moveToCompleted(task!, false)
   selectedIds.value.delete(id)
 }
 

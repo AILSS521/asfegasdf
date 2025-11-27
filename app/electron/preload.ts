@@ -52,31 +52,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }
 })
 
-// 类型声明
-export interface ElectronAPI {
-  minimize: () => Promise<void>
-  maximize: () => Promise<void>
-  close: () => Promise<void>
-  selectFolder: () => Promise<string | null>
-  openPath: (path: string) => Promise<void>
-  showItemInFolder: (path: string) => Promise<void>
-  getDownloadPath: () => Promise<string>
-  setDownloadPath: (path: string) => Promise<string>
-  startDownload: (taskId: string, options: {
-    url: string
-    savePath: string
-    filename: string
-    userAgent?: string
-  }) => Promise<{ success: boolean; error?: string }>
-  pauseDownload: (taskId: string) => Promise<{ success: boolean }>
-  resumeDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
-  cancelDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
-  onDownloadProgress: (callback: (progress: DownloadProgress) => void) => void
-  removeDownloadProgressListener: () => void
-}
-
-declare global {
-  interface Window {
-    electronAPI: ElectronAPI
-  }
-}
