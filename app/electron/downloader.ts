@@ -87,14 +87,11 @@ export class MultiThreadDownloader extends EventEmitter {
         throw new Error('无法获取文件大小')
       }
 
-      // 检查是否支持分片下载
-      const supportsRange = await this.checkRangeSupport()
-
-      if (!supportsRange || this.totalSize < MIN_CHUNK_SIZE * 2) {
-        // 不支持分片或文件太小，使用单线程下载
+      // 百度网盘支持 Range 请求，直接使用多线程下载
+      // 只有文件太小时才使用单线程
+      if (this.totalSize < MIN_CHUNK_SIZE * 2) {
         await this.singleThreadDownload()
       } else {
-        // 多线程分片下载
         await this.multiThreadDownload()
       }
     } catch (error: any) {
@@ -155,7 +152,19 @@ export class MultiThreadDownloader extends EventEmitter {
         },
         timeout: 30000
       }, (res) => {
-        resolve(res.statusCode === 206)
+        // 处理重定向
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          const redirectUrl = res.headers.location
+          if (redirectUrl) {
+            this.url = redirectUrl
+            // 递归检查重定向后的URL
+            this.checkRangeSupport().then(resolve)
+            return
+          }
+        }
+        // 206 表示支持 Range，有些服务器返回 200 但在 Accept-Ranges 头中声明支持
+        const acceptRanges = res.headers['accept-ranges']
+        resolve(res.statusCode === 206 || acceptRanges === 'bytes')
       })
 
       req.on('error', () => resolve(false))
