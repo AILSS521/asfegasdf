@@ -78,65 +78,8 @@ jobs:
           name: windows-build
           path: app/release/*.exe
 
-  build-mac:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Download aria2 for macOS
-        run: |
-          mkdir -p app/aria2
-          brew install aria2
-          cp $(which aria2c) app/aria2/aria2c
-          chmod +x app/aria2/aria2c
-
-      - name: Install dependencies
-        working-directory: ./app
-        run: pnpm install
-
-      - name: Update version
-        working-directory: ./app
-        run: |
-          npm pkg set version="${{ github.event.inputs.version }}"
-
-      - name: Build
-        working-directory: ./app
-        run: pnpm run build:mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-build
-          path: app/release/*.dmg
-
   release:
-    needs: [build-windows, build-mac]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.release == 'true' }}
     steps:
@@ -149,12 +92,6 @@ jobs:
           name: windows-build
           path: ./release
 
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: mac-build
-          path: ./release
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -165,7 +102,6 @@ jobs:
 
             ### 下载
             - Windows: 下载 `.exe` 安装包
-            - macOS: 下载 `.dmg` 安装包
 
             ### 更新内容
             - 首次发布
