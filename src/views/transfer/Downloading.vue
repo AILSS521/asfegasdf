@@ -427,8 +427,8 @@ onMounted(() => {
 .col-size {
   flex-shrink: 0;
   width: 140px;
-  text-align: right;
-  padding-right: 16px;
+  text-align: left;
+  padding-left: 16px;
 }
 
 .col-status {
