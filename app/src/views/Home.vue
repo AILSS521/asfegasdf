@@ -61,7 +61,7 @@
             @mouseenter="hoverFileId = file.fs_id"
             @mouseleave="hoverFileId = null"
           >
-            <div class="col-checkbox">
+            <div class="col-checkbox" :class="{ visible: selectedIds.has(file.fs_id) }">
               <input
                 type="checkbox"
                 :checked="selectedIds.has(file.fs_id)"
@@ -502,6 +502,10 @@ function formatTime(timestamp: number): string {
 
   &:hover {
     background: $bg-hover;
+
+    .col-checkbox {
+      opacity: 1;
+    }
   }
 
   &.selected {
@@ -512,6 +516,12 @@ function formatTime(timestamp: number): string {
 .col-checkbox {
   width: 32px;
   flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  &.visible {
+    opacity: 1;
+  }
 
   input[type="checkbox"] {
     width: 16px;
