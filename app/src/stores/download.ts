@@ -175,7 +175,8 @@ export const useDownloadStore = defineStore('download', () => {
   }
 
   // 标记文件夹中的子文件完成
-  function markFolderSubFileCompleted(taskId: string, fileIndex: number, success: boolean, error?: string) {
+  // 返回 true 表示整个文件夹任务已结束（成功或失败）
+  function markFolderSubFileCompleted(taskId: string, fileIndex: number, success: boolean, error?: string): boolean {
     const task = downloadTasks.value.find(t => t.id === taskId)
     if (task && task.isFolder && task.subFiles && task.subFiles[fileIndex]) {
       const subFile = task.subFiles[fileIndex]
@@ -193,13 +194,22 @@ export const useDownloadStore = defineStore('download', () => {
       task.downloadedSize = task.subFiles.reduce((sum, sf) => sum + sf.downloadedSize, 0)
       task.progress = task.totalSize > 0 ? (task.downloadedSize / task.totalSize) * 100 : 0
 
+      // 如果有子文件失败，立即停止整个文件夹下载
+      if (!success) {
+        task.error = `文件 "${subFile.file.server_filename}" 下载失败: ${error || '未知错误'}`
+        moveToCompleted(task, false)
+        return true // 文件夹任务已结束
+      }
+
       // 检查是否所有文件都完成了
       const allCompleted = task.subFiles.every(sf => sf.status === 'completed' || sf.status === 'error')
       if (allCompleted) {
         const allSuccess = task.subFiles.every(sf => sf.status === 'completed')
         moveToCompleted(task, allSuccess)
+        return true // 文件夹任务已结束
       }
     }
+    return false // 文件夹任务继续
   }
 
   // 获取文件夹中下一个等待的子文件

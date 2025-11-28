@@ -59,22 +59,19 @@ export function useDownloadManager() {
             }
           }
         } else if (progress.status === 'error') {
-          downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, false, progress.error || '下载失败')
-          const wasLarge = folderInfo.isLarge
           folderDownloadMap.value.delete(progress.taskId)
-          // 大文件下载失败后释放锁，并继续下载下一个文件
+          const wasLarge = folderInfo.isLarge
           if (wasLarge) {
             isProcessingLargeFile.value = false
-            processFolderNextFile(task)
           }
-          // 小文件失败后检查是否所有文件都完成了
-          if (!wasLarge) {
-            const allDone = task.subFiles?.every(sf => sf.status === 'completed' || sf.status === 'error')
-            if (allDone) {
-              const allSuccess = task.subFiles?.every(sf => sf.status === 'completed')
-              downloadStore.moveToCompleted(task, allSuccess ?? false)
-              processQueue()
-            }
+
+          // 标记子文件失败，如果返回 true 表示整个文件夹已停止
+          const folderStopped = downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, false, progress.error || '下载失败')
+
+          if (folderStopped) {
+            // 取消该文件夹所有正在进行的下载
+            cancelFolderDownloads(folderInfo.taskId)
+            processQueue()
           }
         } else if (progress.status === 'paused') {
           // 文件夹暂停时，子文件也标记暂停
@@ -111,6 +108,26 @@ export function useDownloadManager() {
   // 移除进度监听
   function removeProgressListener() {
     window.electronAPI?.removeDownloadProgressListener()
+  }
+
+  // 取消文件夹的所有正在进行的下载
+  function cancelFolderDownloads(taskId: string) {
+    // 找出该文件夹所有正在下载的子文件并取消
+    const toCancel: string[] = []
+    folderDownloadMap.value.forEach((info, downloadId) => {
+      if (info.taskId === taskId) {
+        toCancel.push(downloadId)
+        if (info.isLarge) {
+          isProcessingLargeFile.value = false
+        }
+      }
+    })
+
+    // 取消下载并清理映射
+    toCancel.forEach(downloadId => {
+      window.electronAPI?.cancelDownload(downloadId)
+      folderDownloadMap.value.delete(downloadId)
+    })
   }
 
   // 判断任务是否为大文件（>=50MB）
@@ -265,8 +282,12 @@ export function useDownloadManager() {
   async function processFolderNextFile(task: DownloadTask, _isLargeFolder: boolean = false) {
     if (!task.isFolder || !task.subFiles) return
 
-    // 检查任务是否被暂停
-    if (task.status === 'paused') return
+    // 检查任务是否还在下载列表中（可能已被移到失败列表）
+    const currentTask = downloadStore.downloadTasks.find(t => t.id === task.id)
+    if (!currentTask) return
+
+    // 检查任务是否被暂停或已失败
+    if (currentTask.status === 'paused' || currentTask.status === 'error') return
 
     // 获取下一个等待的子文件
     const nextSubFile = downloadStore.getNextWaitingSubFile(task.id)
@@ -375,17 +396,24 @@ export function useDownloadManager() {
       subFile.retryCount++
 
       if (subFile.retryCount >= MAX_RETRY) {
-        downloadStore.markFolderSubFileCompleted(task.id, index, false, error.message || '获取下载链接失败')
+        // 标记子文件失败，这会导致整个文件夹任务停止
+        const folderStopped = downloadStore.markFolderSubFileCompleted(task.id, index, false, error.message || '获取下载链接失败')
         errorCount.value++
-        // 大文件出错后继续下载下一个文件
-        if (isLargeSubFile) {
-          await processFolderNextFile(task)
+
+        if (folderStopped) {
+          // 取消该文件夹所有正在进行的下载
+          cancelFolderDownloads(task.id)
+          processQueue()
         }
       } else {
         // 等待后重试
         setTimeout(() => {
-          subFile.status = 'waiting'
-          processFolderNextFile(task)
+          // 检查任务是否还在下载列表中（可能已被移到失败列表）
+          const stillExists = downloadStore.downloadTasks.find(t => t.id === task.id)
+          if (stillExists && stillExists.status !== 'paused' && stillExists.status !== 'error') {
+            subFile.status = 'waiting'
+            processFolderNextFile(task)
+          }
         }, RETRY_DELAY)
       }
     }
