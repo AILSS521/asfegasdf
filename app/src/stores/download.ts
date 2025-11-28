@@ -25,18 +25,11 @@ export const useDownloadStore = defineStore('download', () => {
   const completedCount = computed(() => completedTasks.value.length)
   const failedCount = computed(() => failedTasks.value.length)
 
-  const SMALL_FILE_THRESHOLD = 50 * 1024 * 1024 // 50MB
-
-  // 活跃下载数（正在下载或暂停的大文件，不包括等待中的和小文件）
-  // 小文件（<50MB）不计入并行限制
+  // 活跃下载数（正在下载、暂停或创建中的任务）
   const activeDownloadCount = computed(() =>
-    downloadTasks.value.filter(t => {
-      const isActive = t.status === 'downloading' || t.status === 'paused' || t.status === 'creating'
-      if (!isActive) return false
-      // 判断是否为大文件
-      const fileSize = t.isFolder ? t.totalSize : t.file.size
-      return fileSize >= SMALL_FILE_THRESHOLD
-    }).length
+    downloadTasks.value.filter(t =>
+      t.status === 'downloading' || t.status === 'paused' || t.status === 'creating'
+    ).length
   )
 
   // 方法

@@ -73,6 +73,10 @@
           <!-- 下载中显示进度条 -->
           <template v-if="task.status === 'downloading' || (task.status === 'paused' && task.progress > 0)">
             <div class="task-progress">
+              <!-- 文件夹显示当前下载的文件名 -->
+              <div class="current-file-name" v-if="task.isFolder && task.currentFileName && task.status === 'downloading'">
+                正在下载: {{ task.currentFileName }}
+              </div>
               <div class="progress-bar">
                 <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
               </div>
@@ -395,6 +399,15 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.current-file-name {
+  font-size: 12px;
+  color: $text-secondary;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 400px;
 }
 
 .progress-bar {

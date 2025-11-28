@@ -60,6 +60,7 @@ export interface DownloadTask {
   completedCount?: number // 已完成的文件数量
   totalCount?: number // 总文件数量
   currentFileIndex?: number // 当前正在下载的文件索引
+  currentFileName?: string // 当前正在下载的文件名
 }
 
 // API响应
