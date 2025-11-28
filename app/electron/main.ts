@@ -71,10 +71,10 @@ function getCurrentDownloadPath(): string {
 // 创建主窗口
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    width: 960,
+    height: 640,
+    minWidth: 800,
+    minHeight: 500,
     frame: false,
     titleBarStyle: 'hidden',
     webPreferences: {
