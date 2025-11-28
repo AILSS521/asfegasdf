@@ -502,14 +502,14 @@ function getTaskPath(task: DownloadTask): string | null {
 }
 
 .modal-content {
-  background: $bg-primary;
+  background: $bg-secondary;
   border-radius: 12px;
   width: 500px;
   max-width: 90vw;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: $shadow-lg;
 }
 
 .modal-header {

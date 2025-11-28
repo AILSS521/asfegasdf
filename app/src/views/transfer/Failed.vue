@@ -437,13 +437,14 @@ function clearAll() {
 }
 
 .modal-content {
-  background: $bg-primary;
+  background: $bg-secondary;
   border-radius: 12px;
   width: 500px;
   max-width: 90%;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  box-shadow: $shadow-lg;
 }
 
 .modal-header {

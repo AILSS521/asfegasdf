@@ -119,6 +119,7 @@ const handleClose = () => {
   justify-content: space-between;
   height: 32px;
   background: $bg-secondary;
+  border-bottom: 1px solid $border-color;
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -154,7 +155,7 @@ const handleClose = () => {
   transition: all 0.15s;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: $bg-hover;
   }
 
   &.close:hover {
@@ -170,51 +171,79 @@ const handleClose = () => {
 }
 
 .sidebar {
-  width: 200px;
+  width: 72px;
   background: $bg-secondary;
   border-right: 1px solid $border-color;
-  padding: 16px 0;
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .nav-menu {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
+  width: 100%;
   padding: 0 8px;
 }
 
 .nav-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  color: $text-secondary;
+  justify-content: center;
+  gap: 4px;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  color: $text-muted;
   text-decoration: none;
   transition: all 0.2s;
+  position: relative;
 
   svg {
     flex-shrink: 0;
+    width: 22px;
+    height: 22px;
   }
 
   span {
-    font-size: 14px;
+    font-size: 11px;
+    font-weight: 500;
   }
 
   &:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: $text-primary;
+    background: $bg-hover;
+    color: $text-secondary;
   }
 
   &.active {
-    background: $primary-color;
-    color: white;
+    background: $primary-light;
+    color: $primary-color;
+
+    svg {
+      color: $primary-color;
+    }
   }
 
-  // 有下载任务时图标变绿色（非激活状态）
+  // 有下载任务时显示角标
   &.has-download:not(.active) {
     svg {
       color: $success-color;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 8px;
+      height: 8px;
+      background: $success-color;
+      border-radius: 50%;
+      border: 2px solid $bg-secondary;
     }
   }
 }
@@ -224,6 +253,7 @@ const handleClose = () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: $bg-primary;
 }
 
 .fade-enter-active,
