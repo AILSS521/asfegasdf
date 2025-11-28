@@ -8,6 +8,7 @@ import path from 'path-browserify'
 const MAX_CONCURRENT_DOWNLOADS = 3
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
+const SMALL_FILE_THRESHOLD = 50 * 1024 * 1024 // 50MB，小于此大小的文件不受串行限制
 
 // 用于跟踪文件夹任务中当前正在下载的子文件
 const folderDownloadMap = ref<Map<string, { taskId: string; fileIndex: number }>>(new Map())
@@ -17,7 +18,7 @@ export function useDownloadManager() {
   const settingsStore = useSettingsStore()
   const api = useApi()
 
-  const isProcessing = ref(false)
+  const isProcessingLargeFile = ref(false) // 仅用于大文件（>=50MB）的串行控制
   const errorCount = ref(0)
 
   // 设置进度监听
@@ -86,10 +87,17 @@ export function useDownloadManager() {
     window.electronAPI?.removeDownloadProgressListener()
   }
 
+  // 判断任务是否为大文件（>=50MB）
+  function isLargeFile(task: DownloadTask): boolean {
+    if (task.isFolder) {
+      // 文件夹任务：检查总大小
+      return task.totalSize >= SMALL_FILE_THRESHOLD
+    }
+    return task.file.size >= SMALL_FILE_THRESHOLD
+  }
+
   // 处理等待队列
   async function processQueue() {
-    if (isProcessing.value) return
-
     // 检查下载中任务数
     if (downloadStore.activeDownloadCount >= MAX_CONCURRENT_DOWNLOADS) {
       return
@@ -106,24 +114,34 @@ export function useDownloadManager() {
 
     if (!nextTask) return
 
-    isProcessing.value = true
+    const isLarge = isLargeFile(nextTask)
+
+    // 大文件需要串行处理，检查是否有大文件正在处理
+    if (isLarge && isProcessingLargeFile.value) {
+      // 有大文件正在处理，延迟重试
+      setTimeout(processQueue, 500)
+      return
+    }
+
+    // 标记大文件开始处理
+    if (isLarge) {
+      isProcessingLargeFile.value = true
+    }
+
+    // 立即继续处理队列中的其他任务（小文件可以并行）
+    setTimeout(processQueue, 100)
 
     if (nextTask.isFolder) {
       // 处理文件夹任务
-      await processFolderTask(nextTask)
+      await processFolderTask(nextTask, isLarge)
     } else {
       // 处理单个文件任务
-      await processFileTask(nextTask)
+      await processFileTask(nextTask, isLarge)
     }
-
-    isProcessing.value = false
-
-    // 继续处理队列
-    setTimeout(processQueue, 500)
   }
 
   // 处理单个文件任务
-  async function processFileTask(task: DownloadTask) {
+  async function processFileTask(task: DownloadTask, isLarge: boolean = false) {
     downloadStore.updateTaskStatus(task.id, 'processing')
 
     try {
@@ -141,6 +159,11 @@ export function useDownloadManager() {
 
       task.downloadUrl = linkData.url
       task.ua = linkData.ua
+
+      // 大文件获取链接完成，释放锁
+      if (isLarge) {
+        isProcessingLargeFile.value = false
+      }
 
       // 更新状态为创建文件中
       downloadStore.updateTaskStatus(task.id, 'creating')
@@ -185,6 +208,12 @@ export function useDownloadManager() {
       }
     } catch (error: any) {
       console.error('获取下载链接失败:', error)
+
+      // 出错也要释放大文件锁
+      if (isLarge) {
+        isProcessingLargeFile.value = false
+      }
+
       task.retryCount++
 
       if (task.retryCount >= MAX_RETRY) {
@@ -202,14 +231,14 @@ export function useDownloadManager() {
   }
 
   // 处理文件夹任务
-  async function processFolderTask(task: DownloadTask) {
+  async function processFolderTask(task: DownloadTask, isLarge: boolean = false) {
     downloadStore.updateTaskStatus(task.id, 'processing')
     // 开始下载文件夹中的第一个文件
-    await processFolderNextFile(task)
+    await processFolderNextFile(task, isLarge)
   }
 
   // 处理文件夹中的下一个文件
-  async function processFolderNextFile(task: DownloadTask) {
+  async function processFolderNextFile(task: DownloadTask, isLargeFolder: boolean = false) {
     if (!task.isFolder || !task.subFiles) return
 
     // 检查任务是否被暂停
@@ -229,6 +258,23 @@ export function useDownloadManager() {
     }
 
     const { index, subFile } = nextSubFile
+
+    // 判断当前子文件是否为大文件
+    const isLargeSubFile = subFile.file.size >= SMALL_FILE_THRESHOLD
+
+    // 如果是大文件夹的第一个文件，已经持有锁；否则需要检查子文件大小
+    const needLock = !isLargeFolder && isLargeSubFile
+
+    // 大文件需要等待锁
+    if (needLock && isProcessingLargeFile.value) {
+      setTimeout(() => processFolderNextFile(task, false), 500)
+      return
+    }
+
+    if (needLock) {
+      isProcessingLargeFile.value = true
+    }
+
     downloadStore.updateFolderSubFileStatus(task.id, index, 'processing')
 
     try {
@@ -246,6 +292,11 @@ export function useDownloadManager() {
 
       subFile.downloadUrl = linkData.url
       subFile.ua = linkData.ua
+
+      // 获取链接完成，释放锁
+      if (isLargeFolder || needLock) {
+        isProcessingLargeFile.value = false
+      }
 
       // 更新状态为创建文件中
       downloadStore.updateFolderSubFileStatus(task.id, index, 'creating')
@@ -290,6 +341,12 @@ export function useDownloadManager() {
       }
     } catch (error: any) {
       console.error('获取下载链接失败:', error)
+
+      // 出错也要释放锁
+      if (isLargeFolder || needLock) {
+        isProcessingLargeFile.value = false
+      }
+
       subFile.retryCount++
 
       if (subFile.retryCount >= MAX_RETRY) {
@@ -333,7 +390,7 @@ export function useDownloadManager() {
   }
 
   return {
-    isProcessing,
+    isProcessingLargeFile,
     errorCount,
     startDownload,
     processQueue,
