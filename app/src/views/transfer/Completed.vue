@@ -343,7 +343,8 @@ function getTaskPath(task: DownloadTask): string | null {
 
 .action-bar {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
   padding: 12px 16px;
   border-bottom: 1px solid $border-color;
 }
@@ -352,18 +353,17 @@ function getTaskPath(task: DownloadTask): string | null {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid $border-color;
-  border-radius: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
   background: transparent;
-  color: $text-secondary;
+  color: $primary-color;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
 
   &:hover {
-    background: $bg-hover;
-    color: $text-primary;
+    background: rgba($primary-color, 0.08);
   }
 }
 

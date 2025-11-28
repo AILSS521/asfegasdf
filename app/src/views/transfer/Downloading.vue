@@ -9,13 +9,15 @@
           </svg>
           暂停
         </button>
+        <span class="action-divider"></span>
         <button class="action-btn" @click="startSelected">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M8 5v14l11-7z"/>
           </svg>
           开始
         </button>
-        <button class="action-btn danger" @click="deleteSelected">
+        <span class="action-divider"></span>
+        <button class="action-btn" @click="deleteSelected">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
@@ -29,13 +31,15 @@
           </svg>
           全部暂停
         </button>
+        <span class="action-divider"></span>
         <button class="action-btn" @click="startAll">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M8 5v14l11-7z"/>
           </svg>
           全部开始
         </button>
-        <button class="action-btn danger" @click="deleteAll">
+        <span class="action-divider"></span>
+        <button class="action-btn" @click="deleteAll">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
@@ -304,33 +308,34 @@ onMounted(() => {
 
 .action-bar {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
   padding: 12px 16px;
   border-bottom: 1px solid $border-color;
+}
+
+.action-divider {
+  width: 1px;
+  height: 14px;
+  background: $border-color;
+  margin: 0 4px;
 }
 
 .action-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid $border-color;
-  border-radius: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
   background: transparent;
-  color: $text-secondary;
+  color: $primary-color;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
 
   &:hover {
-    background: $bg-hover;
-    color: $text-primary;
-  }
-
-  &.danger:hover {
-    background: rgba($danger-color, 0.1);
-    border-color: $danger-color;
-    color: $danger-color;
+    background: rgba($primary-color, 0.08);
   }
 }
 

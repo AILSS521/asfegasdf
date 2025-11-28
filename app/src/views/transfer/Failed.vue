@@ -3,12 +3,13 @@
     <!-- 顶部操作栏 -->
     <div class="action-bar">
       <template v-if="selectedIds.size > 0">
-        <button class="action-btn primary" @click="retrySelected">
+        <button class="action-btn" @click="retrySelected">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
           </svg>
           重试选中
         </button>
+        <span class="action-divider"></span>
         <button class="action-btn" @click="clearSelected">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -17,12 +18,13 @@
         </button>
       </template>
       <template v-else>
-        <button class="action-btn primary" @click="retryAll" :disabled="tasks.length === 0">
+        <button class="action-btn" @click="retryAll" :disabled="tasks.length === 0">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
           </svg>
           全部重试
         </button>
+        <span class="action-divider"></span>
         <button class="action-btn" @click="clearAll" :disabled="tasks.length === 0">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -267,40 +269,38 @@ function clearAll() {
 
 .action-bar {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 4px;
   margin-bottom: 16px;
+}
+
+.action-divider {
+  width: 1px;
+  height: 14px;
+  background: $border-color;
+  margin: 0 4px;
 }
 
 .action-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 6px 8px;
   border: none;
-  border-radius: 6px;
-  background: $bg-tertiary;
-  color: $text-secondary;
+  border-radius: 4px;
+  background: transparent;
+  color: $primary-color;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.15s;
 
   &:hover:not(:disabled) {
-    background: $bg-hover;
-    color: $text-primary;
+    background: rgba($primary-color, 0.08);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-
-  &.primary {
-    background: $primary-color;
-    color: white;
-
-    &:hover:not(:disabled) {
-      background: darken($primary-color, 10%);
-    }
   }
 }
 
