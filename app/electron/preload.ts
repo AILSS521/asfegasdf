@@ -29,6 +29,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDownloadPath: () => ipcRenderer.invoke('settings:getDownloadPath'),
   setDownloadPath: (path: string) => ipcRenderer.invoke('settings:setDownloadPath', path),
 
+  // 配置读写
+  getConfig: (key: string) => ipcRenderer.invoke('config:get', key),
+  setConfig: (key: string, value: any) => ipcRenderer.invoke('config:set', key, value),
+  getAllConfig: () => ipcRenderer.invoke('config:getAll'),
+
   // 下载管理
   startDownload: (taskId: string, options: {
     url: string

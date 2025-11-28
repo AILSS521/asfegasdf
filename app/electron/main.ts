@@ -1,18 +1,71 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import os from 'os'
 import { downloadManager } from './downloader'
 
 let mainWindow: BrowserWindow | null = null
 
-// 获取默认下载目录
+// 获取应用程序目录（打包后是exe所在目录，开发时是项目目录）
+function getAppDirectory(): string {
+  if (app.isPackaged) {
+    // 打包后：exe所在目录
+    return path.dirname(app.getPath('exe'))
+  } else {
+    // 开发时：项目根目录
+    return path.join(__dirname, '..')
+  }
+}
+
+// 获取数据存储目录
+function getDataPath(): string {
+  const dataPath = path.join(getAppDirectory(), 'data')
+  if (!fs.existsSync(dataPath)) {
+    fs.mkdirSync(dataPath, { recursive: true })
+  }
+  return dataPath
+}
+
+// 获取配置文件路径
+function getConfigPath(): string {
+  return path.join(getDataPath(), 'config.json')
+}
+
+// 读取配置
+function loadConfig(): Record<string, any> {
+  const configPath = getConfigPath()
+  if (fs.existsSync(configPath)) {
+    try {
+      const data = fs.readFileSync(configPath, 'utf-8')
+      return JSON.parse(data)
+    } catch (e) {
+      return {}
+    }
+  }
+  return {}
+}
+
+// 保存配置
+function saveConfig(config: Record<string, any>): void {
+  const configPath = getConfigPath()
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+}
+
+// 获取默认下载目录（软件目录下的 Downloads）
 function getDefaultDownloadPath(): string {
-  const downloadPath = path.join(os.homedir(), 'Downloads', '图片下载器')
+  const downloadPath = path.join(getAppDirectory(), 'Downloads')
   if (!fs.existsSync(downloadPath)) {
     fs.mkdirSync(downloadPath, { recursive: true })
   }
   return downloadPath
+}
+
+// 获取当前下载路径（优先使用配置的路径）
+function getCurrentDownloadPath(): string {
+  const config = loadConfig()
+  if (config.downloadPath && fs.existsSync(config.downloadPath)) {
+    return config.downloadPath
+  }
+  return getDefaultDownloadPath()
 }
 
 // 创建主窗口
@@ -84,14 +137,35 @@ ipcMain.handle('shell:showItemInFolder', async (_, filePath: string) => {
 
 // IPC处理 - 设置
 ipcMain.handle('settings:getDownloadPath', () => {
-  return getDefaultDownloadPath()
+  return getCurrentDownloadPath()
 })
 
 ipcMain.handle('settings:setDownloadPath', (_, newPath: string) => {
   if (!fs.existsSync(newPath)) {
     fs.mkdirSync(newPath, { recursive: true })
   }
+  // 保存到配置文件
+  const config = loadConfig()
+  config.downloadPath = newPath
+  saveConfig(config)
   return newPath
+})
+
+// IPC处理 - 配置读写
+ipcMain.handle('config:get', (_, key: string) => {
+  const config = loadConfig()
+  return config[key]
+})
+
+ipcMain.handle('config:set', (_, key: string, value: any) => {
+  const config = loadConfig()
+  config[key] = value
+  saveConfig(config)
+  return true
+})
+
+ipcMain.handle('config:getAll', () => {
+  return loadConfig()
 })
 
 // IPC处理 - 下载管理

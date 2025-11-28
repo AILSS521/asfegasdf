@@ -5,27 +5,19 @@ export const useSettingsStore = defineStore('settings', () => {
   // 下载路径
   const downloadPath = ref('')
 
-  // 初始化
+  // 初始化 - 从主进程读取配置
   async function init() {
-    // 从本地存储读取设置
-    const savedPath = localStorage.getItem('downloadPath')
-    if (savedPath) {
-      downloadPath.value = savedPath
-    } else {
-      // 获取默认下载路径
-      const defaultPath = await window.electronAPI?.getDownloadPath()
-      if (defaultPath) {
-        downloadPath.value = defaultPath
-      }
+    const currentPath = await window.electronAPI?.getDownloadPath()
+    if (currentPath) {
+      downloadPath.value = currentPath
     }
   }
 
-  // 设置下载路径
+  // 设置下载路径 - 保存到主进程配置文件
   async function setDownloadPath(path: string) {
     const newPath = await window.electronAPI?.setDownloadPath(path)
     if (newPath) {
       downloadPath.value = newPath
-      localStorage.setItem('downloadPath', newPath)
     }
   }
 
