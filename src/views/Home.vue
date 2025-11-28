@@ -50,7 +50,7 @@
           </div>
           <div
             class="col-name sortable"
-            :style="{ width: columnWidths.name + 'px' }"
+            :style="{ width: columnWidths.name + '%' }"
             @click="toggleSort('name')"
           >
             <span>文件名</span>
@@ -61,7 +61,7 @@
           </div>
           <div
             class="col-size sortable"
-            :style="{ width: columnWidths.size + 'px' }"
+            :style="{ width: columnWidths.size + '%' }"
             @click="toggleSort('size')"
           >
             <span>大小</span>
@@ -72,7 +72,7 @@
           </div>
           <div
             class="col-type sortable"
-            :style="{ width: columnWidths.type + 'px' }"
+            :style="{ width: columnWidths.type + '%' }"
             @click="toggleSort('type')"
           >
             <span>类型</span>
@@ -83,7 +83,7 @@
           </div>
           <div
             class="col-time sortable"
-            :style="{ width: columnWidths.time + 'px' }"
+            :style="{ width: columnWidths.time + '%' }"
             @click="toggleSort('time')"
           >
             <span>修改时间</span>
@@ -108,7 +108,7 @@
                 @change="toggleSelect(file)"
               />
             </div>
-            <div class="col-name" :style="{ width: columnWidths.name + 'px' }">
+            <div class="col-name" :style="{ width: columnWidths.name + '%' }">
               <div class="file-icon">
                 <FileIcon :filename="file.server_filename" :is-folder="file.isdir === 1" />
               </div>
@@ -141,13 +141,13 @@
                 </svg>
               </button>
             </div>
-            <div class="col-size" :style="{ width: columnWidths.size + 'px' }">
+            <div class="col-size" :style="{ width: columnWidths.size + '%' }">
               {{ file.isdir === 1 ? '--' : formatSize(file.size) }}
             </div>
-            <div class="col-type" :style="{ width: columnWidths.type + 'px' }">
+            <div class="col-type" :style="{ width: columnWidths.type + '%' }">
               {{ getFileType(file) }}
             </div>
-            <div class="col-time" :style="{ width: columnWidths.time + 'px' }">
+            <div class="col-time" :style="{ width: columnWidths.time + '%' }">
               {{ formatTime(file.server_mtime) }}
             </div>
           </div>
@@ -239,12 +239,12 @@ const selectedIds = ref<Set<number | string>>(new Set())
 const sortKey = ref<'name' | 'size' | 'type' | 'time' | null>(null)
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
-// 列宽状态
+// 列宽比例状态（百分比，总和为100）
 const columnWidths = reactive({
-  name: 300,
-  size: 100,
-  type: 100,
-  time: 150
+  name: 46,  // 46%
+  size: 15,  // 15%
+  type: 15,  // 15%
+  time: 24   // 24%
 })
 
 // 列宽拖动状态
@@ -252,6 +252,7 @@ const resizing = ref(false)
 const resizeColumn = ref<string | null>(null)
 const resizeStartX = ref(0)
 const resizeStartWidth = ref(0)
+const tableWidth = ref(0)
 
 // 排序后的文件列表
 const sortedFileList = computed(() => {
@@ -311,6 +312,12 @@ function toggleSort(key: 'name' | 'size' | 'type' | 'time') {
 
 // 开始拖动调整列宽
 function startResize(event: MouseEvent, column: string) {
+  // 获取表格容器宽度（去掉checkbox列的宽度）
+  const tableHeader = (event.target as HTMLElement).closest('.table-header')
+  if (tableHeader) {
+    tableWidth.value = tableHeader.clientWidth - 32 // 减去checkbox列宽度
+  }
+
   resizing.value = true
   resizeColumn.value = column
   resizeStartX.value = event.clientX
@@ -322,13 +329,44 @@ function startResize(event: MouseEvent, column: string) {
   document.body.style.userSelect = 'none'
 }
 
-// 处理拖动 - 只调整当前列宽度，其他列不变
+// 处理拖动 - 调整当前列和下一列的比例
 function handleResize(event: MouseEvent) {
-  if (!resizing.value || !resizeColumn.value) return
+  if (!resizing.value || !resizeColumn.value || tableWidth.value === 0) return
 
   const diff = event.clientX - resizeStartX.value
-  const newWidth = Math.max(60, resizeStartWidth.value + diff)
-  columnWidths[resizeColumn.value as keyof typeof columnWidths] = newWidth
+  // 将像素差转换为百分比差
+  const diffPercent = (diff / tableWidth.value) * 100
+
+  // 定义列的顺序
+  const columns = ['name', 'size', 'type', 'time'] as const
+  const currentIndex = columns.indexOf(resizeColumn.value as typeof columns[number])
+
+  // 计算新的列宽百分比，确保最小5%
+  const newWidth = Math.max(5, Math.min(80, resizeStartWidth.value + diffPercent))
+  const widthDiff = newWidth - columnWidths[resizeColumn.value as keyof typeof columnWidths]
+
+  // 如果有下一列，从下一列扣除相同的宽度
+  if (currentIndex < columns.length - 1) {
+    const nextColumn = columns[currentIndex + 1]
+    const nextWidth = columnWidths[nextColumn] - widthDiff
+
+    // 确保下一列也不会小于5%
+    if (nextWidth >= 5) {
+      columnWidths[resizeColumn.value as keyof typeof columnWidths] = newWidth
+      columnWidths[nextColumn] = nextWidth
+    }
+  } else {
+    // 最后一列，从前一列调整
+    if (currentIndex > 0) {
+      const prevColumn = columns[currentIndex - 1]
+      const prevWidth = columnWidths[prevColumn] - widthDiff
+
+      if (prevWidth >= 5) {
+        columnWidths[resizeColumn.value as keyof typeof columnWidths] = newWidth
+        columnWidths[prevColumn] = prevWidth
+      }
+    }
+  }
 }
 
 // 停止拖动
@@ -733,12 +771,6 @@ onUnmounted(() => {
 .file-table {
   flex: 1;
   overflow: auto;
-
-  // 内容区域允许超出并显示滚动条
-  .table-header,
-  .table-body {
-    min-width: max-content;
-  }
 }
 
 .table-header {
@@ -842,7 +874,7 @@ onUnmounted(() => {
 
 .col-name {
   flex-shrink: 0;
-  min-width: 150px;
+  min-width: 100px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -888,26 +920,38 @@ onUnmounted(() => {
 
 .col-size {
   flex-shrink: 0;
+  min-width: 60px;
   text-align: left;
   color: $text-secondary;
   font-size: 13px;
   padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .col-type {
   flex-shrink: 0;
+  min-width: 60px;
   text-align: left;
   color: $text-secondary;
   font-size: 13px;
   padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .col-time {
   flex-shrink: 0;
+  min-width: 80px;
   text-align: left;
   color: $text-secondary;
   font-size: 13px;
   padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-state {
