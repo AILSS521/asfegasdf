@@ -41,3 +41,10 @@ coverage/
 
 # aria2 binary (will be downloaded during build)
 app/aria2/
+
+# Project specific
+CLAUDE.md
+/web/
+/bot/
+/apis/
+/.spec-workflow/
