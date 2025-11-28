@@ -683,7 +683,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 16px;
-  padding-bottom: 16px; // 正常内边距，悬浮卡片会遮挡底部部分内容
+  padding-bottom: 0; // 文件列表延伸到底部
 }
 
 .list-header {
@@ -1029,11 +1029,10 @@ onUnmounted(() => {
     color: $text-primary;
     font-size: 14px;
     outline: none;
-    transition: border-color 0.2s, width 0.2s;
+    transition: border-color 0.2s;
 
     &:focus {
       border-color: $primary-color;
-      width: 180px;
     }
 
     &::placeholder {
