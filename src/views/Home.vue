@@ -163,9 +163,9 @@
       <p>输入下载编码获取文件列表</p>
     </div>
 
-    <!-- 底部操作栏 -->
-    <div class="bottom-bar">
-      <div class="input-wrapper">
+    <!-- 底部悬浮操作栏 -->
+    <div class="bottom-float-bar">
+      <div class="float-card">
         <input
           v-model="code"
           type="text"
@@ -683,6 +683,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 16px;
+  padding-bottom: 100px; // 为底部悬浮卡片留出空间
 }
 
 .list-header {
@@ -998,17 +999,27 @@ onUnmounted(() => {
   }
 }
 
-.bottom-bar {
-  padding: 16px;
-  background: $bg-secondary;
-  border-top: 1px solid $border-color;
+.bottom-float-bar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
-.input-wrapper {
+.float-card {
   display: flex;
+  align-items: center;
   gap: 8px;
-  max-width: 600px;
-  margin: 0 auto;
+  padding: 12px 16px;
+  background: $bg-secondary;
+  border: 1px solid $border-color;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
 
   input {
     flex: 1;
@@ -1040,6 +1051,7 @@ onUnmounted(() => {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+    flex-shrink: 0;
 
     &:disabled {
       opacity: 0.5;
@@ -1069,7 +1081,7 @@ onUnmounted(() => {
 
 .error-toast {
   position: absolute;
-  bottom: 80px;
+  bottom: 110px;
   left: 50%;
   transform: translateX(-50%);
   padding: 12px 24px;
@@ -1078,6 +1090,7 @@ onUnmounted(() => {
   border-radius: 8px;
   font-size: 14px;
   animation: fadeIn 0.2s;
+  z-index: 11;
 }
 
 @keyframes fadeIn {
