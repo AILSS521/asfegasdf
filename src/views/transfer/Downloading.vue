@@ -72,7 +72,7 @@
         @mouseenter="hoverTaskId = task.id"
         @mouseleave="hoverTaskId = null"
       >
-        <div class="col-checkbox">
+        <div class="col-checkbox" :class="{ visible: selectedIds.has(task.id) }">
           <input
             type="checkbox"
             :checked="selectedIds.has(task.id)"
@@ -390,6 +390,10 @@ onMounted(() => {
   font-size: 13px;
   color: $text-secondary;
   font-weight: 500;
+
+  .col-checkbox {
+    opacity: 1;
+  }
 }
 
 .col-checkbox {
@@ -398,6 +402,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  &.visible {
+    opacity: 1;
+  }
 
   input[type="checkbox"] {
     width: 16px;
@@ -440,6 +450,10 @@ onMounted(() => {
 
   &:hover {
     background: $bg-hover;
+
+    .col-checkbox {
+      opacity: 1;
+    }
   }
 
   .col-file {
