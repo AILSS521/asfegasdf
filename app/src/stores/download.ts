@@ -251,24 +251,15 @@ export const useDownloadStore = defineStore('download', () => {
     const task = downloadTasks.value.find(t => t.id === taskId)
     if (task && task.status === 'paused') {
       if (task.isFolder && task.subFiles) {
-        // 文件夹任务：检查当前子文件是否有下载URL
-        const currentSubFile = task.currentFileIndex !== undefined ? task.subFiles[task.currentFileIndex] : null
-        if (currentSubFile && currentSubFile.downloadUrl && currentSubFile.status === 'paused') {
-          // 恢复当前子文件的下载
-          const subFileDownloadId = `${task.id}-sub-${task.currentFileIndex}`
-          task.status = 'downloading'
-          currentSubFile.status = 'downloading'
-          window.electronAPI?.resumeDownload(subFileDownloadId)
-        } else {
-          // 还没开始下载或需要重新开始，改为等待状态
-          task.status = 'waiting'
-          // 恢复暂停的子文件为等待状态
-          task.subFiles.forEach(sf => {
-            if (sf.status === 'paused') {
-              sf.status = 'waiting'
-            }
-          })
-        }
+        // 文件夹任务：统一设为等待状态，由 processQueue 处理
+        // 因为需要在 useDownloadManager 中设置 folderDownloadMap
+        task.status = 'waiting'
+        // 恢复暂停的子文件为等待状态（只恢复 paused 状态的，已完成的保留）
+        task.subFiles.forEach(sf => {
+          if (sf.status === 'paused') {
+            sf.status = 'waiting'
+          }
+        })
       } else if (task.downloadUrl) {
         // 普通文件任务：如果已经开始下载过，调用恢复API
         task.status = 'downloading'
@@ -305,7 +296,7 @@ export const useDownloadStore = defineStore('download', () => {
     downloadTasks.value.forEach(task => {
       if (task.status === 'paused') {
         if (task.isFolder && task.subFiles) {
-          // 文件夹任务：改为等待状态，让 processQueue 处理
+          // 文件夹任务：统一设为等待状态，由 processQueue 处理
           task.status = 'waiting'
           task.subFiles.forEach(sf => {
             if (sf.status === 'paused') {
@@ -313,6 +304,7 @@ export const useDownloadStore = defineStore('download', () => {
             }
           })
         } else if (task.downloadUrl) {
+          // 普通文件任务：如果已经开始下载过，调用恢复API
           task.status = 'downloading'
           window.electronAPI?.resumeDownload(task.id)
         } else {

@@ -256,6 +256,8 @@ export function useDownloadManager() {
       // 再次检查任务状态（异步操作前）
       const taskBeforeApi = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskBeforeApi || taskBeforeApi.status === 'paused' || taskBeforeApi.status === 'error') {
+        // 恢复子文件状态，以便下次恢复时能找到
+        downloadStore.updateFolderSubFileStatus(task.id, index, 'waiting')
         return
       }
 
@@ -277,6 +279,8 @@ export function useDownloadManager() {
       // 获取链接后再次检查任务状态
       const taskAfterApi = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskAfterApi || taskAfterApi.status === 'paused' || taskAfterApi.status === 'error') {
+        // 恢复子文件状态，以便下次恢复时能找到
+        downloadStore.updateFolderSubFileStatus(task.id, index, 'waiting')
         return
       }
 
