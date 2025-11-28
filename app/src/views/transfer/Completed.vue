@@ -315,7 +315,6 @@ function getTaskPath(task: DownloadTask): string | null {
       // relativePath 现在是类似 "文件夹名/子文件夹/文件.txt" 的格式
       // 我们需要的是 "文件夹名" 这一级的本地路径
       const relativeDir = path.dirname(relativePath)  // "文件夹名/子文件夹" 或 "文件夹名"
-      const folderName = relativePath.split('/')[0]   // "文件夹名"
 
       // 从 subFileDir 往上找，直到找到文件夹名对应的目录
       // subFileDir 对应的是 relativeDir，所以需要去掉多余的层级
