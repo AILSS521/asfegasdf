@@ -731,6 +731,7 @@ onUnmounted(() => {
   top: 0;
   z-index: 1;
   user-select: none;
+  border-bottom: 1px solid $border-color;
 }
 
 .sortable {
@@ -738,6 +739,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   position: relative;
+  border-right: 1px solid $border-color;
+
+  &:last-child {
+    border-right: none;
+  }
 
   &:hover {
     color: $primary-color;
@@ -849,10 +855,10 @@ onUnmounted(() => {
 
 .col-size {
   flex-shrink: 0;
-  text-align: right;
+  text-align: left;
   color: $text-secondary;
   font-size: 13px;
-  padding-right: 8px;
+  padding: 0 8px;
 }
 
 .col-type {
@@ -860,14 +866,15 @@ onUnmounted(() => {
   text-align: left;
   color: $text-secondary;
   font-size: 13px;
-  padding-right: 8px;
+  padding: 0 8px;
 }
 
 .col-time {
   flex-shrink: 0;
-  text-align: right;
+  text-align: left;
   color: $text-secondary;
   font-size: 13px;
+  padding: 0 8px;
 }
 
 .empty-state {
