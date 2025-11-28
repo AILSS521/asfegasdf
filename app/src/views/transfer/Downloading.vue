@@ -25,14 +25,14 @@
         </button>
       </div>
       <div class="action-group" v-else>
-        <button class="action-btn" @click="pauseAll" :disabled="tasks.length === 0">
+        <button class="action-btn" @click="pauseAll" :disabled="!canPauseAll">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
           </svg>
           全部暂停
         </button>
         <span class="action-divider"></span>
-        <button class="action-btn" @click="startAll" :disabled="tasks.length === 0">
+        <button class="action-btn" @click="startAll" :disabled="!canStartAll">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M8 5v14l11-7z"/>
           </svg>
@@ -183,6 +183,16 @@ const downloadManager = useDownloadManager()
 const tasks = computed(() => downloadStore.downloadTasks)
 const selectedIds = ref<Set<string>>(new Set())
 const hoverTaskId = ref<string | null>(null)
+
+// 是否有可暂停的任务（非暂停、非异常状态的任务）
+const canPauseAll = computed(() => {
+  return tasks.value.some(t => t.status !== 'paused' && t.status !== 'error')
+})
+
+// 是否有可开始的任务（暂停或异常状态的任务）
+const canStartAll = computed(() => {
+  return tasks.value.some(t => t.status === 'paused' || t.status === 'error')
+})
 
 function toggleSelect(id: string) {
   if (selectedIds.value.has(id)) {

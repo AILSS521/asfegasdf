@@ -284,7 +284,7 @@ function clearAll() {
   }
 
   &:disabled {
-    opacity: 0.5;
+    color: $text-muted;
     cursor: not-allowed;
   }
 }
