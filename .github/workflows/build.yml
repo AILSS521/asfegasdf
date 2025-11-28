@@ -6,7 +6,9 @@ on:
       - main
       - master
     paths:
-      - 'app/**'
+      - 'src/**'
+      - 'electron/**'
+      - 'package.json'
       - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
@@ -54,12 +56,10 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        working-directory: ./app
         run: pnpm install
 
       - name: Get version from package.json
         id: get_version
-        working-directory: ./app
         run: |
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
           $version = $pkg.version
@@ -73,14 +73,13 @@ jobs:
         shell: pwsh
 
       - name: Build
-        working-directory: ./app
         run: pnpm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create portable zip
         run: |
-          cd app/release
+          cd release
           Compress-Archive -Path "win-unpacked/*" -DestinationPath "图片下载器-v${{ steps.get_version.outputs.VERSION }}-portable.zip"
         shell: pwsh
 
@@ -88,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-build-${{ steps.get_version.outputs.VERSION }}
-          path: app/release/*.zip
+          path: release/*.zip
 
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
