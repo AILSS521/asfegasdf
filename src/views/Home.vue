@@ -683,7 +683,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 16px;
-  padding-bottom: 100px; // 为底部悬浮卡片留出空间
+  padding-bottom: 16px; // 正常内边距，悬浮卡片会遮挡底部部分内容
 }
 
 .list-header {
@@ -1005,36 +1005,35 @@ onUnmounted(() => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  width: 100%;
-  max-width: 560px;
-  padding: 0 16px;
-  box-sizing: border-box;
+  pointer-events: none; // 让底层内容可点击
 }
 
 .float-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: $bg-secondary;
   border: 1px solid $border-color;
-  border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  pointer-events: auto; // 卡片本身可交互
 
   input {
-    flex: 1;
-    height: 40px;
-    padding: 0 16px;
+    width: 140px;
+    height: 36px;
+    padding: 0 14px;
     border: 1px solid $border-color;
-    border-radius: 8px;
+    border-radius: 18px;
     background: $bg-tertiary;
     color: $text-primary;
     font-size: 14px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, width 0.2s;
 
     &:focus {
       border-color: $primary-color;
+      width: 180px;
     }
 
     &::placeholder {
@@ -1043,11 +1042,11 @@ onUnmounted(() => {
   }
 
   button {
-    height: 40px;
-    padding: 0 20px;
+    height: 36px;
+    padding: 0 16px;
     border: none;
-    border-radius: 8px;
-    font-size: 14px;
+    border-radius: 18px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
