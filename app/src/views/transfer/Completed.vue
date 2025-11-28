@@ -176,6 +176,7 @@ import { useDownloadStore } from '@/stores/download'
 import { useDownloadManager } from '@/composables/useDownloadManager'
 import type { DownloadTask, SubFileTask } from '@/types'
 import dayjs from 'dayjs'
+import path from 'path-browserify'
 
 const router = useRouter()
 const downloadStore = useDownloadStore()
@@ -279,24 +280,52 @@ function retryFailedFromModal() {
   }
 }
 
-// 获取任务的本地路径（文件夹任务从子文件中获取）
+// 获取任务的本地路径（用于打开文件所在位置）
 function getTaskPath(task: DownloadTask): string | null {
   // 普通文件直接返回 localPath
   if (!task.isFolder) {
     return task.localPath || null
   }
 
-  // 文件夹任务：从已完成的子文件中获取路径
+  // 文件夹任务：需要获取文件夹本身的路径（不是子文件的路径）
+  // 从子文件的路径推断出文件夹的路径
   if (task.subFiles && task.subFiles.length > 0) {
-    // 找到第一个有 localPath 的已完成子文件
-    const completedSubFile = task.subFiles.find(sf => sf.status === 'completed' && sf.localPath)
-    if (completedSubFile?.localPath) {
-      return completedSubFile.localPath
-    }
-    // 如果没有已完成的，尝试找任意有 localPath 的子文件
-    const anySubFile = task.subFiles.find(sf => sf.localPath)
-    if (anySubFile?.localPath) {
-      return anySubFile.localPath
+    // 找到第一个有 localPath 的子文件
+    const subFileWithPath = task.subFiles.find(sf => sf.localPath)
+    if (subFileWithPath?.localPath) {
+      // 获取子文件的目录路径
+      const subFileDir = path.dirname(subFileWithPath.localPath)
+      // 根据 downloadBasePath 计算文件夹的实际路径
+      // 文件夹名称就是 task.file.server_filename
+      // 需要找到这个文件夹在本地的位置
+
+      // 子文件的相对路径（相对于 downloadBasePath）
+      const subFilePath = subFileWithPath.file.path
+      const basePath = task.downloadBasePath || ''
+
+      // 计算子文件相对于文件夹的深度
+      let relativePath = ''
+      if (basePath && subFilePath.startsWith(basePath)) {
+        relativePath = subFilePath.slice(basePath.length)
+        if (relativePath.startsWith('/')) {
+          relativePath = relativePath.slice(1)
+        }
+      }
+
+      // relativePath 现在是类似 "文件夹名/子文件夹/文件.txt" 的格式
+      // 我们需要的是 "文件夹名" 这一级的本地路径
+      const relativeDir = path.dirname(relativePath)  // "文件夹名/子文件夹" 或 "文件夹名"
+      const folderName = relativePath.split('/')[0]   // "文件夹名"
+
+      // 从 subFileDir 往上找，直到找到文件夹名对应的目录
+      // subFileDir 对应的是 relativeDir，所以需要去掉多余的层级
+      const extraLevels = relativeDir.split('/').filter(Boolean).length - 1
+      let folderPath = subFileDir
+      for (let i = 0; i < extraLevels; i++) {
+        folderPath = path.dirname(folderPath)
+      }
+
+      return folderPath
     }
   }
 
