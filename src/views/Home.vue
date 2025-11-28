@@ -770,7 +770,8 @@ onUnmounted(() => {
 
 .file-table {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .table-header {
@@ -786,6 +787,8 @@ onUnmounted(() => {
   z-index: 1;
   user-select: none;
   border-bottom: 1px solid $border-color;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sortable {
@@ -840,6 +843,8 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-radius: 4px;
   transition: background 0.15s;
+  width: 100%;
+  box-sizing: border-box;
 
   &:hover {
     background: $bg-hover;
