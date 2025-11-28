@@ -127,7 +127,9 @@
         <input
           v-model="code"
           type="text"
+          inputmode="numeric"
           placeholder="输入下载编码"
+          @input="filterNonNumeric"
           @keyup.enter="handleFetch"
         />
         <button class="btn-fetch" @click="handleFetch" :disabled="loading || !code.trim()">
@@ -402,6 +404,15 @@ async function downloadSelected() {
   // 有任务添加则开始下载
   if (files.length > 0 || folders.length > 0) {
     downloadManager.startDownload()
+  }
+}
+
+// 过滤非数字输入
+function filterNonNumeric(event: Event) {
+  const input = event.target as HTMLInputElement
+  const filtered = input.value.replace(/\D/g, '')
+  if (filtered !== input.value) {
+    code.value = filtered
   }
 }
 
