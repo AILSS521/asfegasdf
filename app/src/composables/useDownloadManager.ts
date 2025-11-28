@@ -20,7 +20,7 @@ export function useDownloadManager() {
   // 设置进度监听
   function setupProgressListener() {
     window.electronAPI?.onDownloadProgress((progress: DownloadProgress) => {
-      const task = downloadStore.downloadingTasks.find(t => t.id === progress.taskId)
+      const task = downloadStore.downloadTasks.find(t => t.id === progress.taskId)
       if (!task) return
 
       if (progress.status === 'downloading') {
@@ -32,11 +32,11 @@ export function useDownloadManager() {
         )
       } else if (progress.status === 'completed') {
         downloadStore.moveToCompleted(task, true)
-        processWaitingQueue()
+        processQueue()
       } else if (progress.status === 'error') {
         task.error = progress.error || '下载失败'
         downloadStore.moveToCompleted(task, false)
-        processWaitingQueue()
+        processQueue()
       } else if (progress.status === 'paused') {
         task.status = 'paused'
       }
@@ -49,7 +49,7 @@ export function useDownloadManager() {
   }
 
   // 处理等待队列
-  async function processWaitingQueue() {
+  async function processQueue() {
     if (isProcessing.value) return
 
     // 检查下载中任务数
@@ -59,19 +59,17 @@ export function useDownloadManager() {
 
     // 检查错误数量
     if (errorCount.value >= 3) {
-      downloadStore.pauseAllWaiting()
+      downloadStore.pauseAll()
       return
     }
 
     // 获取下一个等待任务
-    const nextTask = downloadStore.waitingTasks.find(
-      t => t.status === 'waiting'
-    )
+    const nextTask = downloadStore.getNextWaitingTask()
 
     if (!nextTask) return
 
     isProcessing.value = true
-    downloadStore.updateWaitingTaskStatus(nextTask.id, 'processing')
+    downloadStore.updateTaskStatus(nextTask.id, 'processing')
 
     try {
       // 获取下载链接
@@ -88,6 +86,9 @@ export function useDownloadManager() {
 
       nextTask.downloadUrl = linkData.url
       nextTask.ua = linkData.ua
+
+      // 更新状态为创建文件中
+      downloadStore.updateTaskStatus(nextTask.id, 'creating')
 
       // 计算本地路径
       let localDir: string
@@ -121,8 +122,8 @@ export function useDownloadManager() {
       })
 
       if (result?.success) {
-        // 移动到下载中
-        downloadStore.moveToDownloading(nextTask)
+        // 更新为下载中状态
+        downloadStore.updateTaskStatus(nextTask.id, 'downloading')
         errorCount.value = 0
       } else {
         throw new Error(result?.error || '启动下载失败')
@@ -139,7 +140,7 @@ export function useDownloadManager() {
         // 等待后重试
         setTimeout(() => {
           nextTask.status = 'waiting'
-          processWaitingQueue()
+          processQueue()
         }, RETRY_DELAY)
       }
     } finally {
@@ -147,7 +148,7 @@ export function useDownloadManager() {
     }
 
     // 继续处理队列
-    setTimeout(processWaitingQueue, 500)
+    setTimeout(processQueue, 500)
   }
 
   // 暂停下载
@@ -167,7 +168,7 @@ export function useDownloadManager() {
 
   // 开始下载
   function startDownload() {
-    processWaitingQueue()
+    processQueue()
   }
 
   // 重置错误计数
@@ -179,7 +180,7 @@ export function useDownloadManager() {
     isProcessing,
     errorCount,
     startDownload,
-    processWaitingQueue,
+    processQueue,
     resetErrorCount,
     pauseTask,
     resumeTask,

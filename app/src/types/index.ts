@@ -11,7 +11,14 @@ export interface FileItem {
 }
 
 // 任务状态
-export type TaskStatus = 'waiting' | 'processing' | 'downloading' | 'paused' | 'completed' | 'error'
+// waiting: 等待中
+// processing: 处理中（正在获取下载链接）
+// creating: 创建文件中（正在预创建文件）
+// downloading: 下载中
+// paused: 已暂停
+// completed: 已完成
+// error: 异常
+export type TaskStatus = 'waiting' | 'processing' | 'creating' | 'downloading' | 'paused' | 'completed' | 'error'
 
 // 下载任务
 export interface DownloadTask {

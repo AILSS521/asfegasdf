@@ -3,17 +3,6 @@
     <!-- 侧边导航 -->
     <div class="transfer-sidebar">
       <router-link
-        to="/transfer/waiting"
-        class="sidebar-item"
-        active-class="active"
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18">
-          <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-        </svg>
-        <span>等待中</span>
-        <span class="badge" v-if="waitingCount > 0">{{ waitingCount }}</span>
-      </router-link>
-      <router-link
         to="/transfer/downloading"
         class="sidebar-item"
         active-class="active"
@@ -22,7 +11,7 @@
           <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
         </svg>
         <span>下载中</span>
-        <span class="badge" v-if="downloadingCount > 0">{{ downloadingCount }}</span>
+        <span class="badge" v-if="downloadCount > 0">{{ downloadCount }}</span>
       </router-link>
       <router-link
         to="/transfer/completed"
@@ -50,8 +39,7 @@ import { useDownloadStore } from '@/stores/download'
 
 const downloadStore = useDownloadStore()
 
-const waitingCount = computed(() => downloadStore.waitingCount)
-const downloadingCount = computed(() => downloadStore.downloadingCount)
+const downloadCount = computed(() => downloadStore.downloadCount)
 const completedCount = computed(() => downloadStore.completedCount)
 </script>
 

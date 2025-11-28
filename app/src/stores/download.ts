@@ -3,9 +3,8 @@ import { ref, computed } from 'vue'
 import type { FileItem, DownloadTask, TaskStatus } from '@/types'
 
 export const useDownloadStore = defineStore('download', () => {
-  // 状态
-  const waitingTasks = ref<DownloadTask[]>([])
-  const downloadingTasks = ref<DownloadTask[]>([])
+  // 状态 - 合并等待和下载中为一个列表
+  const downloadTasks = ref<DownloadTask[]>([])
   const completedTasks = ref<DownloadTask[]>([])
 
   // 当前会话数据
@@ -21,13 +20,16 @@ export const useDownloadStore = defineStore('download', () => {
   } | null>(null)
 
   // 计算属性
-  const waitingCount = computed(() => waitingTasks.value.length)
-  const downloadingCount = computed(() => downloadingTasks.value.length)
+  const downloadCount = computed(() => downloadTasks.value.length)
   const completedCount = computed(() => completedTasks.value.length)
 
-  // 下载中任务数（包括暂停的）
+  // 活跃下载数（正在下载或暂停的，不包括等待中的）
   const activeDownloadCount = computed(() =>
-    downloadingTasks.value.filter(t => t.status === 'downloading' || t.status === 'paused').length
+    downloadTasks.value.filter(t =>
+      t.status === 'downloading' ||
+      t.status === 'paused' ||
+      t.status === 'creating'
+    ).length
   )
 
   // 方法
@@ -47,7 +49,8 @@ export const useDownloadStore = defineStore('download', () => {
     basePath.value = path
   }
 
-  function addToWaiting(files: FileItem[], downloadBasePath: string | null = null) {
+  // 添加任务到下载列表
+  function addToDownload(files: FileItem[], downloadBasePath: string | null = null) {
     const newTasks: DownloadTask[] = files.map(file => ({
       id: `${Date.now()}-${file.fs_id}`,
       file,
@@ -58,111 +61,119 @@ export const useDownloadStore = defineStore('download', () => {
       totalSize: file.size,
       createdAt: Date.now(),
       retryCount: 0,
-      downloadBasePath // 下载基础路径，null 表示直接放在下载目录
+      downloadBasePath
     }))
-    waitingTasks.value.push(...newTasks)
+    downloadTasks.value.push(...newTasks)
   }
 
-  function removeFromWaiting(taskIds: string[]) {
-    waitingTasks.value = waitingTasks.value.filter(t => !taskIds.includes(t.id))
+  // 从下载列表移除任务
+  function removeFromDownload(taskIds: string[]) {
+    downloadTasks.value = downloadTasks.value.filter(t => !taskIds.includes(t.id))
   }
 
-  function moveToDownloading(task: DownloadTask) {
-    const index = waitingTasks.value.findIndex(t => t.id === task.id)
-    if (index > -1) {
-      waitingTasks.value.splice(index, 1)
-      task.status = 'downloading'
-      downloadingTasks.value.push(task)
-    }
-  }
-
+  // 移动到已完成
   function moveToCompleted(task: DownloadTask, success: boolean = true) {
-    const index = downloadingTasks.value.findIndex(t => t.id === task.id)
+    const index = downloadTasks.value.findIndex(t => t.id === task.id)
     if (index > -1) {
-      downloadingTasks.value.splice(index, 1)
+      downloadTasks.value.splice(index, 1)
       task.status = success ? 'completed' : 'error'
       task.completedAt = Date.now()
       completedTasks.value.unshift(task)
     }
   }
 
-  function updateTaskProgress(taskId: string, progress: number, speed: number, downloadedSize: number) {
-    const task = downloadingTasks.value.find(t => t.id === taskId)
-    if (task) {
-      task.progress = progress
-      task.speed = speed
-      task.downloadedSize = downloadedSize
-    }
-  }
-
-  function pauseTask(taskId: string) {
-    const task = downloadingTasks.value.find(t => t.id === taskId)
-    if (task) {
-      task.status = 'paused'
-      window.electronAPI?.pauseDownload(taskId)
-    }
-  }
-
-  function resumeTask(taskId: string) {
-    const task = downloadingTasks.value.find(t => t.id === taskId)
-    if (task && task.status === 'paused') {
-      task.status = 'downloading'
-      window.electronAPI?.resumeDownload(taskId)
-    }
-  }
-
-  function pauseAllDownloading() {
-    downloadingTasks.value.forEach(task => {
-      if (task.status === 'downloading') {
-        pauseTask(task.id)
-      }
-    })
-  }
-
-  function resumeAllDownloading() {
-    downloadingTasks.value.forEach(task => {
-      if (task.status === 'paused') {
-        resumeTask(task.id)
-      }
-    })
-  }
-
-  function clearCompleted() {
-    completedTasks.value = []
-  }
-
-  function removeCompleted(taskIds: string[]) {
-    completedTasks.value = completedTasks.value.filter(t => !taskIds.includes(t.id))
-  }
-
-  // 等待任务状态更新
-  function updateWaitingTaskStatus(taskId: string, status: TaskStatus) {
-    const task = waitingTasks.value.find(t => t.id === taskId)
+  // 更新任务状态
+  function updateTaskStatus(taskId: string, status: TaskStatus) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
     if (task) {
       task.status = status
     }
   }
 
-  function pauseAllWaiting() {
-    waitingTasks.value.forEach(task => {
-      if (task.status === 'waiting' || task.status === 'processing') {
+  // 更新任务进度
+  function updateTaskProgress(taskId: string, progress: number, speed: number, downloadedSize: number) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task) {
+      task.progress = progress
+      task.speed = speed
+      task.downloadedSize = downloadedSize
+      if (task.status !== 'downloading') {
+        task.status = 'downloading'
+      }
+    }
+  }
+
+  // 暂停任务
+  function pauseTask(taskId: string) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task && (task.status === 'downloading' || task.status === 'waiting' || task.status === 'processing' || task.status === 'creating')) {
+      // 只有正在下载的任务需要调用 electron API
+      if (task.status === 'downloading') {
+        window.electronAPI?.pauseDownload(taskId)
+      }
+      task.status = 'paused'
+    }
+  }
+
+  // 恢复任务
+  function resumeTask(taskId: string) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task && task.status === 'paused') {
+      // 如果任务已经开始下载过，调用恢复API
+      if (task.downloadUrl) {
+        task.status = 'downloading'
+        window.electronAPI?.resumeDownload(taskId)
+      } else {
+        // 还没开始下载，改为等待状态
+        task.status = 'waiting'
+      }
+    }
+  }
+
+  // 暂停所有任务
+  function pauseAll() {
+    downloadTasks.value.forEach(task => {
+      if (task.status === 'downloading') {
+        window.electronAPI?.pauseDownload(task.id)
+      }
+      if (task.status === 'downloading' || task.status === 'waiting' || task.status === 'processing') {
         task.status = 'paused'
       }
     })
   }
 
-  function resumeAllWaiting() {
-    waitingTasks.value.forEach(task => {
+  // 恢复所有任务
+  function resumeAll() {
+    downloadTasks.value.forEach(task => {
       if (task.status === 'paused') {
-        task.status = 'waiting'
+        if (task.downloadUrl) {
+          task.status = 'downloading'
+          window.electronAPI?.resumeDownload(task.id)
+        } else {
+          task.status = 'waiting'
+        }
       }
     })
   }
 
+  // 清空已完成
+  function clearCompleted() {
+    completedTasks.value = []
+  }
+
+  // 移除已完成的任务
+  function removeCompleted(taskIds: string[]) {
+    completedTasks.value = completedTasks.value.filter(t => !taskIds.includes(t.id))
+  }
+
+  // 获取下一个等待中的任务
+  function getNextWaitingTask(): DownloadTask | undefined {
+    return downloadTasks.value.find(t => t.status === 'waiting')
+  }
+
   return {
     // 状态
-    waitingTasks,
-    downloadingTasks,
+    downloadTasks,
     completedTasks,
     currentCode,
     currentFileList,
@@ -170,8 +181,7 @@ export const useDownloadStore = defineStore('download', () => {
     sessionData,
 
     // 计算属性
-    waitingCount,
-    downloadingCount,
+    downloadCount,
     completedCount,
     activeDownloadCount,
 
@@ -180,19 +190,17 @@ export const useDownloadStore = defineStore('download', () => {
     setCurrentFileList,
     setBasePath,
     setSessionData,
-    addToWaiting,
-    removeFromWaiting,
-    moveToDownloading,
+    addToDownload,
+    removeFromDownload,
     moveToCompleted,
+    updateTaskStatus,
     updateTaskProgress,
     pauseTask,
     resumeTask,
-    pauseAllDownloading,
-    resumeAllDownloading,
+    pauseAll,
+    resumeAll,
     clearCompleted,
     removeCompleted,
-    updateWaitingTaskStatus,
-    pauseAllWaiting,
-    resumeAllWaiting
+    getNextWaitingTask
   }
 })

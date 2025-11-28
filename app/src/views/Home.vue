@@ -284,8 +284,8 @@ function toggleSelectAll() {
 // 下载单个文件（不创建子目录）
 function downloadSingle(file: FileItem) {
   // 单个文件下载，downloadBasePath 为 null 表示直接放在下载目录
-  downloadStore.addToWaiting([file], null)
-  router.push('/transfer/waiting')
+  downloadStore.addToDownload([file], null)
+  router.push('/transfer/downloading')
 }
 
 // 下载文件夹（保留文件夹本身）
@@ -299,8 +299,8 @@ async function downloadFolder(folder: FileItem) {
       // 例如：点击下载 /网盘/A 文件夹，basePath 设为 /网盘
       // 文件 /网盘/A/B/1.txt 的相对路径就是 A/B/1.txt
       const folderParentPath = folder.path.substring(0, folder.path.lastIndexOf('/')) || '/'
-      downloadStore.addToWaiting(allFiles, folderParentPath)
-      router.push('/transfer/waiting')
+      downloadStore.addToDownload(allFiles, folderParentPath)
+      router.push('/transfer/downloading')
     } else {
       errorMessage.value = '文件夹内没有可下载的文件'
       setTimeout(() => {
@@ -341,8 +341,8 @@ function downloadSelected() {
   if (selected.length > 0) {
     // 选中的文件，如果只有一个就不创建子目录，多个则以当前路径为基础
     const downloadBasePath = selected.length === 1 ? null : currentPath.value
-    downloadStore.addToWaiting(selected, downloadBasePath)
-    router.push('/transfer/waiting')
+    downloadStore.addToDownload(selected, downloadBasePath)
+    router.push('/transfer/downloading')
   }
 }
 

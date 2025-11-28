@@ -14,12 +14,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/transfer/waiting'
-      },
-      {
-        path: 'waiting',
-        name: 'Waiting',
-        component: () => import('@/views/transfer/Waiting.vue')
+        redirect: '/transfer/downloading'
       },
       {
         path: 'downloading',

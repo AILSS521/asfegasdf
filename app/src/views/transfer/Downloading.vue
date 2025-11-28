@@ -70,24 +70,40 @@
         </div>
         <div class="task-info">
           <div class="task-name">{{ task.file.server_filename }}</div>
-          <div class="task-progress">
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
+          <!-- 下载中显示进度条 -->
+          <template v-if="task.status === 'downloading' || (task.status === 'paused' && task.progress > 0)">
+            <div class="task-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
+              </div>
+              <div class="progress-text">
+                <template v-if="task.status === 'paused'">
+                  已暂停 · {{ task.progress.toFixed(1) }}%
+                </template>
+                <template v-else>
+                  {{ formatSpeed(task.speed) }} · {{ task.progress.toFixed(1) }}%
+                </template>
+              </div>
             </div>
-            <div class="progress-text">
-              <template v-if="task.status === 'paused'">
-                已暂停 · {{ task.progress.toFixed(1) }}%
-              </template>
-              <template v-else>
-                {{ formatSpeed(task.speed) }} · {{ task.progress.toFixed(1) }}%
-              </template>
+          </template>
+          <!-- 其他状态显示文字 -->
+          <template v-else>
+            <div class="task-status" :class="task.status">
+              {{ getStatusText(task.status) }}
+              <span v-if="task.error" class="error-text">: {{ task.error }}</span>
             </div>
-          </div>
+          </template>
         </div>
         <div class="task-size">
-          {{ formatSize(task.downloadedSize) }} / {{ formatSize(task.totalSize) }}
+          <template v-if="task.status === 'downloading' || (task.status === 'paused' && task.progress > 0)">
+            {{ formatSize(task.downloadedSize) }} / {{ formatSize(task.totalSize) }}
+          </template>
+          <template v-else>
+            {{ task.file.isdir === 1 ? '--' : formatSize(task.file.size) }}
+          </template>
         </div>
         <div class="task-actions" v-if="hoverTaskId === task.id">
+          <!-- 正在下载 - 显示暂停按钮 -->
           <button
             v-if="task.status === 'downloading'"
             class="icon-btn"
@@ -98,16 +114,29 @@
               <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
             </svg>
           </button>
+          <!-- 等待中/处理中 - 显示暂停按钮 -->
           <button
-            v-if="task.status === 'paused'"
+            v-if="task.status === 'waiting' || task.status === 'processing' || task.status === 'creating'"
+            class="icon-btn"
+            @click="pauseTask(task.id)"
+            title="暂停"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+          </button>
+          <!-- 已暂停/异常 - 显示开始按钮 -->
+          <button
+            v-if="task.status === 'paused' || task.status === 'error'"
             class="icon-btn"
             @click="resumeTask(task.id)"
-            title="继续"
+            title="开始"
           >
             <svg viewBox="0 0 24 24" width="18" height="18">
               <path fill="currentColor" d="M8 5v14l11-7z"/>
             </svg>
           </button>
+          <!-- 删除按钮 -->
           <button
             class="icon-btn danger"
             @click="deleteTask(task.id)"
@@ -126,18 +155,21 @@
       <svg viewBox="0 0 24 24" width="48" height="48">
         <path fill="#5f6368" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
       </svg>
-      <p>没有正在下载的任务</p>
+      <p>没有下载任务</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useDownloadStore } from '@/stores/download'
+import { useDownloadManager } from '@/composables/useDownloadManager'
+import type { TaskStatus } from '@/types'
 
 const downloadStore = useDownloadStore()
+const downloadManager = useDownloadManager()
 
-const tasks = computed(() => downloadStore.downloadingTasks)
+const tasks = computed(() => downloadStore.downloadTasks)
 const selectedIds = ref<Set<string>>(new Set())
 const hoverTaskId = ref<string | null>(null)
 
@@ -147,6 +179,19 @@ function toggleSelect(id: string) {
   } else {
     selectedIds.value.add(id)
   }
+}
+
+function getStatusText(status: TaskStatus): string {
+  const statusMap: Record<TaskStatus, string> = {
+    waiting: '等待中',
+    processing: '处理中',
+    creating: '创建文件中',
+    downloading: '下载中',
+    paused: '已暂停',
+    completed: '已完成',
+    error: '异常'
+  }
+  return statusMap[status] || status
 }
 
 function formatSize(bytes: number): string {
@@ -166,19 +211,37 @@ function pauseTask(id: string) {
 }
 
 function resumeTask(id: string) {
-  downloadStore.resumeTask(id)
+  const task = tasks.value.find(t => t.id === id)
+  if (task) {
+    if (task.status === 'error') {
+      // 异常任务重置状态重新下载
+      task.status = 'waiting'
+      task.error = undefined
+      task.retryCount = 0
+      downloadManager.processQueue()
+    } else {
+      downloadStore.resumeTask(id)
+      downloadManager.processQueue()
+    }
+  }
 }
 
 async function deleteTask(id: string) {
   const task = tasks.value.find(t => t.id === id)
   if (task) {
-    try {
-      await window.electronAPI?.cancelDownload(id)
-    } catch (e) {
-      // ignore
+    // 如果正在下载，先取消
+    if (task.status === 'downloading' || task.status === 'paused') {
+      try {
+        await window.electronAPI?.cancelDownload(id)
+      } catch (e) {
+        // ignore
+      }
+      task.error = '已取消'
+      downloadStore.moveToCompleted(task, false)
+    } else {
+      // 等待中的直接删除
+      downloadStore.removeFromDownload([id])
     }
-    task.error = '已取消'
-    downloadStore.moveToCompleted(task, false)
   }
   selectedIds.value.delete(id)
 }
@@ -199,11 +262,12 @@ async function deleteSelected() {
 }
 
 function pauseAll() {
-  downloadStore.pauseAllDownloading()
+  downloadStore.pauseAll()
 }
 
 function startAll() {
-  downloadStore.resumeAllDownloading()
+  downloadStore.resumeAll()
+  downloadManager.processQueue()
 }
 
 async function deleteAll() {
@@ -212,6 +276,10 @@ async function deleteAll() {
   }
   selectedIds.value.clear()
 }
+
+onMounted(() => {
+  downloadManager.startDownload()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -297,7 +365,21 @@ async function deleteAll() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.task-status {
+  font-size: 12px;
+
+  &.waiting { color: $text-secondary; }
+  &.processing { color: $primary-color; }
+  &.creating { color: $primary-color; }
+  &.paused { color: $warning-color; }
+  &.error { color: $danger-color; }
+
+  .error-text {
+    color: $danger-color;
+  }
 }
 
 .task-progress {
