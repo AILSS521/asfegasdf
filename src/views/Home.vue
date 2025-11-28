@@ -280,8 +280,17 @@ const sortedFileList = computed(() => {
   })
 })
 
+// 是否刚刚完成拖动（用于阻止误触排序）
+const justResized = ref(false)
+
 // 切换排序
 function toggleSort(key: 'name' | 'size' | 'type' | 'time') {
+  // 如果刚完成拖动，不触发排序
+  if (justResized.value) {
+    justResized.value = false
+    return
+  }
+
   if (sortKey.value === key) {
     if (sortOrder.value === 'asc') {
       sortOrder.value = 'desc'
@@ -322,6 +331,8 @@ function handleResize(event: MouseEvent) {
 function stopResize() {
   resizing.value = false
   resizeColumn.value = null
+  // 标记刚完成拖动，阻止 click 事件触发排序
+  justResized.value = true
 
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
