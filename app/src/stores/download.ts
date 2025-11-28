@@ -6,6 +6,7 @@ export const useDownloadStore = defineStore('download', () => {
   // 状态 - 合并等待和下载中为一个列表
   const downloadTasks = ref<DownloadTask[]>([])
   const completedTasks = ref<DownloadTask[]>([])
+  const failedTasks = ref<DownloadTask[]>([])
 
   // 当前会话数据
   const currentCode = ref('')
@@ -22,6 +23,7 @@ export const useDownloadStore = defineStore('download', () => {
   // 计算属性
   const downloadCount = computed(() => downloadTasks.value.length)
   const completedCount = computed(() => completedTasks.value.length)
+  const failedCount = computed(() => failedTasks.value.length)
 
   const SMALL_FILE_THRESHOLD = 50 * 1024 * 1024 // 50MB
 
@@ -114,14 +116,18 @@ export const useDownloadStore = defineStore('download', () => {
     downloadTasks.value = downloadTasks.value.filter(t => !taskIds.includes(t.id))
   }
 
-  // 移动到已完成
+  // 移动到已完成或失败列表
   function moveToCompleted(task: DownloadTask, success: boolean = true) {
     const index = downloadTasks.value.findIndex(t => t.id === task.id)
     if (index > -1) {
       downloadTasks.value.splice(index, 1)
       task.status = success ? 'completed' : 'error'
       task.completedAt = Date.now()
-      completedTasks.value.unshift(task)
+      if (success) {
+        completedTasks.value.unshift(task)
+      } else {
+        failedTasks.value.unshift(task)
+      }
     }
   }
 
@@ -284,7 +290,142 @@ export const useDownloadStore = defineStore('download', () => {
     return downloadTasks.value.find(t => t.status === 'waiting')
   }
 
-  // 从已完成列表中重新下载任务
+  // 从失败列表中重新下载任务
+  function retryFromFailed(taskId: string) {
+    const taskIndex = failedTasks.value.findIndex(t => t.id === taskId)
+    if (taskIndex === -1) return
+
+    const task = failedTasks.value[taskIndex]
+    // 从失败列表移除
+    failedTasks.value.splice(taskIndex, 1)
+
+    // 重置任务状态
+    task.status = 'waiting'
+    task.error = undefined
+    task.retryCount = 0
+    task.progress = 0
+    task.speed = 0
+    task.downloadedSize = 0
+    task.completedAt = undefined
+    task.downloadUrl = undefined
+    task.ua = undefined
+
+    // 如果是文件夹，重置所有子文件状态
+    if (task.isFolder && task.subFiles) {
+      task.subFiles.forEach(sf => {
+        sf.status = 'waiting'
+        sf.error = undefined
+        sf.retryCount = 0
+        sf.progress = 0
+        sf.speed = 0
+        sf.downloadedSize = 0
+        sf.downloadUrl = undefined
+        sf.ua = undefined
+      })
+      task.completedCount = 0
+    }
+
+    // 添加到下载列表
+    downloadTasks.value.push(task)
+  }
+
+  // 重试失败列表中文件夹的失败子文件
+  function retryFailedSubFilesFromFailed(taskId: string) {
+    const taskIndex = failedTasks.value.findIndex(t => t.id === taskId)
+    if (taskIndex === -1) return
+
+    const task = failedTasks.value[taskIndex]
+    if (!task.isFolder || !task.subFiles) return
+
+    // 检查是否有失败的文件
+    const hasFailedFiles = task.subFiles.some(sf => sf.status === 'error')
+    if (!hasFailedFiles) return
+
+    // 从失败列表移除
+    failedTasks.value.splice(taskIndex, 1)
+
+    // 重置任务状态
+    task.status = 'waiting'
+    task.error = undefined
+
+    // 只重置失败的子文件
+    task.subFiles.forEach(sf => {
+      if (sf.status === 'error') {
+        sf.status = 'waiting'
+        sf.error = undefined
+        sf.retryCount = 0
+        sf.progress = 0
+        sf.speed = 0
+        sf.downloadedSize = 0
+        sf.downloadUrl = undefined
+        sf.ua = undefined
+      }
+    })
+
+    // 重新计算进度
+    task.completedCount = task.subFiles.filter(sf => sf.status === 'completed').length
+    task.downloadedSize = task.subFiles.reduce((sum, sf) => sum + sf.downloadedSize, 0)
+    task.progress = task.totalSize > 0 ? (task.downloadedSize / task.totalSize) * 100 : 0
+
+    // 添加到下载列表
+    downloadTasks.value.push(task)
+  }
+
+  // 获取失败列表中文件夹的失败子文件
+  function getFailedSubFilesFromFailed(taskId: string): SubFileTask[] {
+    const task = failedTasks.value.find(t => t.id === taskId)
+    if (!task || !task.isFolder || !task.subFiles) return []
+    return task.subFiles.filter(sf => sf.status === 'error')
+  }
+
+  // 移除失败任务
+  function removeFromFailed(taskIds: string[]) {
+    failedTasks.value = failedTasks.value.filter(t => !taskIds.includes(t.id))
+  }
+
+  // 清空失败列表
+  function clearFailed() {
+    failedTasks.value = []
+  }
+
+  // 重试所有失败任务
+  function retryAllFailed() {
+    const tasks = [...failedTasks.value]
+    failedTasks.value = []
+
+    tasks.forEach(task => {
+      // 重置任务状态
+      task.status = 'waiting'
+      task.error = undefined
+      task.retryCount = 0
+      task.progress = 0
+      task.speed = 0
+      task.downloadedSize = 0
+      task.completedAt = undefined
+      task.downloadUrl = undefined
+      task.ua = undefined
+
+      // 如果是文件夹，重置所有子文件状态
+      if (task.isFolder && task.subFiles) {
+        task.subFiles.forEach(sf => {
+          sf.status = 'waiting'
+          sf.error = undefined
+          sf.retryCount = 0
+          sf.progress = 0
+          sf.speed = 0
+          sf.downloadedSize = 0
+          sf.downloadUrl = undefined
+          sf.ua = undefined
+        })
+        task.completedCount = 0
+      }
+
+      // 添加到下载列表
+      downloadTasks.value.push(task)
+    })
+  }
+
+  // 从已完成列表中重新下载任务（保留兼容）
   function retryFromCompleted(taskId: string) {
     const taskIndex = completedTasks.value.findIndex(t => t.id === taskId)
     if (taskIndex === -1) return
@@ -376,6 +517,7 @@ export const useDownloadStore = defineStore('download', () => {
     // 状态
     downloadTasks,
     completedTasks,
+    failedTasks,
     currentCode,
     currentFileList,
     basePath,
@@ -384,6 +526,7 @@ export const useDownloadStore = defineStore('download', () => {
     // 计算属性
     downloadCount,
     completedCount,
+    failedCount,
     activeDownloadCount,
 
     // 方法
@@ -410,6 +553,13 @@ export const useDownloadStore = defineStore('download', () => {
     getNextWaitingTask,
     retryFromCompleted,
     retryFailedSubFiles,
-    getFailedSubFiles
+    getFailedSubFiles,
+    // 失败任务相关
+    retryFromFailed,
+    retryFailedSubFilesFromFailed,
+    getFailedSubFilesFromFailed,
+    removeFromFailed,
+    clearFailed,
+    retryAllFailed
   }
 })

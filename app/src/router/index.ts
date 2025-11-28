@@ -25,6 +25,11 @@ const routes: RouteRecordRaw[] = [
         path: 'completed',
         name: 'Completed',
         component: () => import('@/views/transfer/Completed.vue')
+      },
+      {
+        path: 'failed',
+        name: 'Failed',
+        component: () => import('@/views/transfer/Failed.vue')
       }
     ]
   },
