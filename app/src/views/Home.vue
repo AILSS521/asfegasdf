@@ -41,7 +41,7 @@
       <!-- 文件表格 -->
       <div class="file-table">
         <div class="table-header">
-          <div class="col-checkbox">
+          <div class="col-checkbox header-checkbox">
             <input
               type="checkbox"
               :checked="isAllSelected"
@@ -519,7 +519,8 @@ function formatTime(timestamp: number): string {
   opacity: 0;
   transition: opacity 0.15s;
 
-  &.visible {
+  &.visible,
+  &.header-checkbox {
     opacity: 1;
   }
 
