@@ -184,7 +184,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useDownloadStore } from '@/stores/download'
 import { useDownloadManager } from '@/composables/useDownloadManager'
 import FileIcon from '@/components/FileIcon.vue'
-import type { TaskStatus, DownloadTask } from '@/types'
+import type { TaskStatus } from '@/types'
 
 const downloadStore = useDownloadStore()
 const downloadManager = useDownloadManager()
