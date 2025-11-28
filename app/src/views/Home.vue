@@ -288,15 +288,18 @@ function downloadSingle(file: FileItem) {
   router.push('/transfer/waiting')
 }
 
-// 下载文件夹（以该文件夹为根目录）
+// 下载文件夹（保留文件夹本身）
 async function downloadFolder(folder: FileItem) {
   // 获取文件夹内所有文件（递归）
   try {
     loading.value = true
     const allFiles = await getAllFilesInFolder(folder.path)
     if (allFiles.length > 0) {
-      // 以被下载的文件夹为基础路径
-      downloadStore.addToWaiting(allFiles, folder.path)
+      // 以被下载文件夹的父目录为基础路径，这样下载目录中会创建文件夹本身
+      // 例如：点击下载 /网盘/A 文件夹，basePath 设为 /网盘
+      // 文件 /网盘/A/B/1.txt 的相对路径就是 A/B/1.txt
+      const folderParentPath = folder.path.substring(0, folder.path.lastIndexOf('/')) || '/'
+      downloadStore.addToWaiting(allFiles, folderParentPath)
       router.push('/transfer/waiting')
     } else {
       errorMessage.value = '文件夹内没有可下载的文件'
