@@ -3,10 +3,10 @@ node_modules/
 .pnpm-store/
 
 # Build outputs
-app/dist/
-app/dist-electron/
-app/dist-typecheck/
-app/release/
+dist/
+dist-electron/
+dist-typecheck/
+release/
 
 # IDE
 .vscode/
@@ -40,7 +40,7 @@ pnpm-debug.log*
 coverage/
 
 # aria2 binary (will be downloaded during build)
-app/aria2/
+aria2/
 
 # Project specific
 CLAUDE.md
