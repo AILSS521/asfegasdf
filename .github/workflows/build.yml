@@ -58,6 +58,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Download aria2
+        run: |
+          # 创建 resources/aria2 目录
+          New-Item -ItemType Directory -Force -Path "resources/aria2"
+          # 下载 aria2 Windows 版本
+          $aria2Url = "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip"
+          $aria2Zip = "aria2.zip"
+          Invoke-WebRequest -Uri $aria2Url -OutFile $aria2Zip
+          # 解压并移动 aria2c.exe
+          Expand-Archive -Path $aria2Zip -DestinationPath "aria2_temp" -Force
+          Copy-Item "aria2_temp/aria2-1.37.0-win-64bit-build1/aria2c.exe" "resources/aria2/aria2c.exe"
+          # 清理
+          Remove-Item $aria2Zip
+          Remove-Item -Recurse -Force "aria2_temp"
+          # 验证
+          Get-ChildItem "resources/aria2"
+        shell: pwsh
+
       - name: Get version from package.json
         id: get_version
         run: |
