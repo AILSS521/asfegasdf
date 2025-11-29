@@ -26,10 +26,10 @@ export const useDownloadStore = defineStore('download', () => {
   const completedCount = computed(() => completedTasks.value.length)
   const failedCount = computed(() => failedTasks.value.length)
 
-  // 活跃下载数（正在下载、暂停或创建中的任务）
+  // 活跃下载数（处理中、正在下载、暂停或创建中的任务）
   const activeDownloadCount = computed(() =>
     downloadTasks.value.filter(t =>
-      t.status === 'downloading' || t.status === 'paused' || t.status === 'creating'
+      t.status === 'processing' || t.status === 'downloading' || t.status === 'paused' || t.status === 'creating'
     ).length
   )
 
