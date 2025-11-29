@@ -161,7 +161,7 @@ export class Aria2Client extends EventEmitter {
       '--continue=true',
       '--auto-file-renaming=false',
       '--allow-overwrite=true',
-      '--file-allocation=none',
+      '--file-allocation=prealloc',
       '--console-log-level=warn',
       '--summary-interval=0',
       '--disk-cache=64M',
