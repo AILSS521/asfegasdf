@@ -2,10 +2,11 @@ import { ref } from 'vue'
 import { useDownloadStore } from '@/stores/download'
 import { useSettingsStore } from '@/stores/settings'
 import { useApi } from './useApi'
-import type { DownloadProgress, DownloadTask } from '@/types'
+import type { DownloadProgress, DownloadTask, SubFileTask } from '@/types'
 import path from 'path-browserify'
 
 const MAX_CONCURRENT_DOWNLOADS = 3
+const MAX_FOLDER_CONCURRENT = 3  // 文件夹内子文件最大并行数
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
 
@@ -41,9 +42,20 @@ export function useDownloadManager() {
         } else if (progress.status === 'completed') {
           downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, true)
           folderDownloadMap.value.delete(progress.taskId)
-          // 串行下载：完成后继续下载下一个文件（但要检查任务是否被暂停）
+          // 并行下载：完成后尝试启动更多子文件
           if (task.status !== 'paused' && task.status !== 'error') {
-            processFolderNextFile(task)
+            // 检查是否所有文件都完成了
+            if (task.subFiles) {
+              const allDone = task.subFiles.every(sf => sf.status === 'completed' || sf.status === 'error')
+              if (allDone) {
+                const allSuccess = task.subFiles.every(sf => sf.status === 'completed')
+                downloadStore.moveToCompleted(task, allSuccess)
+                processQueue()
+              } else {
+                // 继续下载下一批文件
+                fillFolderDownloadSlots(task)
+              }
+            }
           }
         } else if (progress.status === 'error') {
           folderDownloadMap.value.delete(progress.taskId)
@@ -102,6 +114,17 @@ export function useDownloadManager() {
       window.electronAPI?.cancelDownload(downloadId)
       folderDownloadMap.value.delete(downloadId)
     })
+  }
+
+  // 获取文件夹当前活跃的子文件下载数量
+  function getFolderActiveCount(taskId: string): number {
+    let count = 0
+    folderDownloadMap.value.forEach((info) => {
+      if (info.taskId === taskId) {
+        count++
+      }
+    })
+    return count
   }
 
   // 处理等待队列
@@ -237,12 +260,36 @@ export function useDownloadManager() {
     } else {
       downloadStore.updateTaskStatus(task.id, 'processing')
     }
-    // 开始串行下载文件夹中的文件
-    await processFolderNextFile(task)
+    // 并行启动多个子文件下载
+    await fillFolderDownloadSlots(task)
   }
 
-  // 处理文件夹中的下一个文件（严格串行）
-  async function processFolderNextFile(task: DownloadTask) {
+  // 填充文件夹的下载槽位（并行下载）
+  async function fillFolderDownloadSlots(task: DownloadTask) {
+    if (!task.isFolder || !task.subFiles) return
+
+    // 检查任务状态
+    const currentTask = downloadStore.downloadTasks.find(t => t.id === task.id)
+    if (!currentTask || currentTask.status === 'paused' || currentTask.status === 'error') return
+
+    // 计算可以启动的数量
+    const activeCount = getFolderActiveCount(task.id)
+    const slotsAvailable = MAX_FOLDER_CONCURRENT - activeCount
+
+    if (slotsAvailable <= 0) return
+
+    // 启动多个子文件下载
+    for (let i = 0; i < slotsAvailable; i++) {
+      const nextSubFile = downloadStore.getNextWaitingSubFile(task.id)
+      if (!nextSubFile) break
+
+      // 不等待，直接启动（并行）
+      startSubFileDownload(task, nextSubFile.index, nextSubFile.subFile)
+    }
+  }
+
+  // 启动单个子文件下载
+  async function startSubFileDownload(task: DownloadTask, index: number, subFile: SubFileTask) {
     if (!task.isFolder || !task.subFiles) return
 
     // 检查任务是否还在下载列表中
@@ -252,22 +299,7 @@ export function useDownloadManager() {
     // 检查任务是否被暂停或已失败
     if (currentTask.status === 'paused' || currentTask.status === 'error') return
 
-    // 获取下一个需要下载的子文件（跳过已完成的）
-    const nextSubFile = downloadStore.getNextWaitingSubFile(task.id)
-    if (!nextSubFile) {
-      // 没有更多文件需要下载，检查是否全部完成
-      const allDone = task.subFiles.every(sf => sf.status === 'completed' || sf.status === 'error')
-      if (allDone) {
-        const allSuccess = task.subFiles.every(sf => sf.status === 'completed')
-        downloadStore.moveToCompleted(task, allSuccess)
-        processQueue()
-      }
-      return
-    }
-
-    const { index, subFile } = nextSubFile
-
-    // 更新当前正在下载的文件名
+    // 更新当前正在下载的文件名（显示最新启动的）
     task.currentFileName = subFile.file.server_filename
     task.currentFileIndex = index
 
@@ -374,7 +406,7 @@ export function useDownloadManager() {
           const stillExists = downloadStore.downloadTasks.find(t => t.id === task.id)
           if (stillExists && stillExists.status !== 'paused' && stillExists.status !== 'error') {
             subFile.status = 'waiting'
-            processFolderNextFile(task)
+            fillFolderDownloadSlots(task)
           }
         }, RETRY_DELAY)
       }
@@ -416,6 +448,6 @@ export function useDownloadManager() {
     cancelTask,
     setupProgressListener,
     removeProgressListener,
-    processFolderNextFile
+    fillFolderDownloadSlots
   }
 }
