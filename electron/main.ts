@@ -1,9 +1,16 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import https from 'https'
 import { downloadManager } from './downloader'
 
 let mainWindow: BrowserWindow | null = null
+let splashWindow: BrowserWindow | null = null
+
+// 当前客户端版本
+const CLIENT_VERSION = '1.0.0'
+// 版本检查API地址
+const VERSION_API_URL = 'https://download.linglong521.cn/version.php'
 
 // 获取应用程序目录（打包后是exe所在目录，开发时是项目目录）
 function getAppDirectory(): string {
@@ -66,6 +73,77 @@ function getCurrentDownloadPath(): string {
     return config.downloadPath
   }
   return getDefaultDownloadPath()
+}
+
+// 版本检查
+function checkVersion(): Promise<{ success: boolean; needUpdate?: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const request = https.get(VERSION_API_URL, { timeout: 10000 }, (res) => {
+      let data = ''
+      res.on('data', (chunk) => {
+        data += chunk
+      })
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data)
+          if (json.code === 200 && json.data?.version) {
+            const serverVersion = json.data.version
+            if (serverVersion === CLIENT_VERSION) {
+              resolve({ success: true })
+            } else {
+              resolve({ success: false, needUpdate: true })
+            }
+          } else {
+            resolve({ success: false, error: '无法获取版本号' })
+          }
+        } catch (e) {
+          resolve({ success: false, error: '解析版本信息失败' })
+        }
+      })
+    })
+
+    request.on('error', () => {
+      resolve({ success: false, error: '网络请求失败' })
+    })
+
+    request.on('timeout', () => {
+      request.destroy()
+      resolve({ success: false, error: '请求超时' })
+    })
+  })
+}
+
+// 创建启动画面窗口
+function createSplashWindow(): void {
+  splashWindow = new BrowserWindow({
+    width: 320,
+    height: 160,
+    frame: false,
+    transparent: false,
+    resizable: false,
+    movable: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    backgroundColor: '#ffffff',
+    webPreferences: {
+      preload: path.join(__dirname, 'splash-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+
+  // 居中显示
+  splashWindow.center()
+
+  if (process.env.VITE_DEV_SERVER_URL) {
+    splashWindow.loadFile(path.join(__dirname, '../public/splash.html'))
+  } else {
+    splashWindow.loadFile(path.join(__dirname, '../dist/splash.html'))
+  }
+
+  splashWindow.on('closed', () => {
+    splashWindow = null
+  })
 }
 
 // 创建主窗口
@@ -219,9 +297,28 @@ ipcMain.handle('download:cancel', async (_, taskId: string) => {
   }
 })
 
+// IPC处理 - 启动画面
+ipcMain.handle('splash:checkVersion', async () => {
+  return await checkVersion()
+})
+
+ipcMain.handle('splash:proceed', () => {
+  // 关闭启动画面，打开主窗口
+  if (splashWindow) {
+    splashWindow.close()
+    splashWindow = null
+  }
+  createWindow()
+})
+
+ipcMain.handle('splash:close', () => {
+  // 关闭程序
+  app.quit()
+})
+
 // 应用生命周期
 app.whenReady().then(() => {
-  createWindow()
+  createSplashWindow()
 })
 
 app.on('window-all-closed', () => {

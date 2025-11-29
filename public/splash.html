@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片下载器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+      background: #ffffff;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .splash-container {
+      width: 100%;
+      padding: 20px 24px;
+      opacity: 0;
+      transform: scale(0.9) translateY(10px);
+      animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes slideIn {
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .splash-container.fade-out {
+      animation: slideOut 0.3s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+    }
+
+    @keyframes slideOut {
+      to {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+      }
+    }
+
+    .title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ff69b4;
+      margin-bottom: 16px;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .log-area {
+      min-height: 60px;
+    }
+
+    .log-line {
+      font-size: 13px;
+      color: #ff69b4;
+      line-height: 1.8;
+      padding-left: 4px;
+      opacity: 0;
+      transform: translateX(-10px);
+      animation: logFadeIn 0.3s ease forwards;
+    }
+
+    @keyframes logFadeIn {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .log-line::before {
+      content: '>';
+      margin-right: 8px;
+      opacity: 0.6;
+    }
+
+    .log-line.error {
+      color: #ff4757;
+    }
+
+    .log-line.success {
+      color: #2ed573;
+    }
+
+    .countdown {
+      font-size: 12px;
+      color: #ffb6c1;
+      margin-top: 12px;
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 0.3s ease 0.5s forwards;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+
+    .progress-dot {
+      display: inline-block;
+      animation: dotPulse 1s infinite;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    .loading-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0% { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+      100% { content: ''; }
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-container" id="container">
+    <div class="title">图片下载器</div>
+    <div class="log-area" id="logArea"></div>
+    <div class="countdown" id="countdown"></div>
+  </div>
+
+  <script>
+    const logArea = document.getElementById('logArea');
+    const countdown = document.getElementById('countdown');
+    const container = document.getElementById('container');
+
+    // 添加日志行
+    function addLog(text, type = 'normal') {
+      const line = document.createElement('div');
+      line.className = `log-line ${type}`;
+      line.style.animationDelay = `${logArea.children.length * 0.1}s`;
+      line.textContent = text;
+      logArea.appendChild(line);
+    }
+
+    // 开始倒计时
+    function startCountdown(seconds, callback) {
+      let remaining = seconds;
+      countdown.textContent = `${remaining} 秒后自动退出`;
+      countdown.style.display = 'block';
+
+      const timer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(timer);
+          callback();
+        } else {
+          countdown.textContent = `${remaining} 秒后自动退出`;
+        }
+      }, 1000);
+    }
+
+    // 退出动画
+    function fadeOutAndClose() {
+      container.classList.add('fade-out');
+      setTimeout(() => {
+        window.electronSplashAPI?.close();
+      }, 300);
+    }
+
+    // 进入主程序动画
+    function fadeOutAndProceed() {
+      container.classList.add('fade-out');
+      setTimeout(() => {
+        window.electronSplashAPI?.proceed();
+      }, 300);
+    }
+
+    // 初始化
+    async function init() {
+      addLog('开始初始化...');
+
+      await new Promise(r => setTimeout(r, 500));
+      addLog('开始更新检查...');
+
+      try {
+        const result = await window.electronSplashAPI?.checkVersion();
+
+        if (result.success) {
+          addLog('版本检查通过', 'success');
+          await new Promise(r => setTimeout(r, 300));
+          fadeOutAndProceed();
+        } else if (result.needUpdate) {
+          addLog('请更新软件', 'error');
+          startCountdown(10, fadeOutAndClose);
+        } else {
+          addLog('更新检查失败，10秒后自动退出', 'error');
+          startCountdown(10, fadeOutAndClose);
+        }
+      } catch (error) {
+        addLog('更新检查失败，10秒后自动退出', 'error');
+        startCountdown(10, fadeOutAndClose);
+      }
+    }
+
+    // 页面加载完成后开始初始化
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(init, 200);
+    });
+  </script>
+</body>
+</html>
