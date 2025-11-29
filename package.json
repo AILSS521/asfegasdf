@@ -48,6 +48,13 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "resources/aria2",
+        "to": "aria2",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": [
         {

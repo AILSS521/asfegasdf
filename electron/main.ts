@@ -247,43 +247,43 @@ ipcMain.handle('config:getAll', () => {
 })
 
 // IPC处理 - 下载管理
-ipcMain.handle('download:start', (_, taskId: string, options: {
+ipcMain.handle('download:start', async (_, taskId: string, options: {
   url: string
   savePath: string
   filename: string
   userAgent?: string
 }) => {
   try {
-    downloadManager.addTask(taskId, {
+    // 使用 aria2 添加下载任务
+    await downloadManager.addTask(taskId, {
       url: options.url,
       savePath: options.savePath,
       filename: options.filename,
-      userAgent: options.userAgent,
-      threads: 64
-    })
-    // 在后台启动下载，不阻塞 IPC 返回
-    downloadManager.startTask(taskId).catch((error: Error) => {
-      console.error('下载失败:', error)
+      userAgent: options.userAgent
     })
     return { success: true }
   } catch (error: any) {
+    console.error('添加下载任务失败:', error)
     return { success: false, error: error.message }
   }
 })
 
-ipcMain.handle('download:pause', (_, taskId: string) => {
-  downloadManager.pauseTask(taskId)
-  return { success: true }
-})
-
-ipcMain.handle('download:resume', (_, taskId: string) => {
+ipcMain.handle('download:pause', async (_, taskId: string) => {
   try {
-    // 在后台恢复下载，不阻塞 IPC 返回
-    downloadManager.resumeTask(taskId).catch((error: Error) => {
-      console.error('恢复下载失败:', error)
-    })
+    await downloadManager.pauseTask(taskId)
     return { success: true }
   } catch (error: any) {
+    console.error('暂停下载失败:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('download:resume', async (_, taskId: string) => {
+  try {
+    await downloadManager.resumeTask(taskId)
+    return { success: true }
+  } catch (error: any) {
+    console.error('恢复下载失败:', error)
     return { success: false, error: error.message }
   }
 })
@@ -293,6 +293,7 @@ ipcMain.handle('download:cancel', async (_, taskId: string) => {
     await downloadManager.cancelTask(taskId)
     return { success: true }
   } catch (error: any) {
+    console.error('取消下载失败:', error)
     return { success: false, error: error.message }
   }
 })
@@ -321,9 +322,25 @@ app.whenReady().then(() => {
   createSplashWindow()
 })
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
+  // 停止 aria2 进程
+  try {
+    await downloadManager.stop()
+  } catch {
+    // 忽略错误
+  }
+
   if (process.platform !== 'darwin') {
     app.quit()
+  }
+})
+
+app.on('before-quit', async () => {
+  // 确保 aria2 进程被停止
+  try {
+    await downloadManager.stop()
+  } catch {
+    // 忽略错误
   }
 })
 
