@@ -13,6 +13,9 @@ const RETRY_DELAY = 5000
 // 用于跟踪文件夹任务中当前正在下载的子文件
 const folderDownloadMap = ref<Map<string, { taskId: string; fileIndex: number }>>(new Map())
 
+// 文件夹速度更新定时器
+let folderSpeedTimer: ReturnType<typeof setInterval> | null = null
+
 export function useDownloadManager() {
   const downloadStore = useDownloadStore()
   const settingsStore = useSettingsStore()
@@ -22,6 +25,13 @@ export function useDownloadManager() {
 
   // 设置进度监听
   function setupProgressListener() {
+    // 启动文件夹速度更新定时器（每秒一次）
+    if (!folderSpeedTimer) {
+      folderSpeedTimer = setInterval(() => {
+        downloadStore.updateAllFolderSpeeds()
+      }, 1000)
+    }
+
     window.electronAPI?.onDownloadProgress((progress: DownloadProgress) => {
       // 检查是否是文件夹子文件的下载
       const folderInfo = folderDownloadMap.value.get(progress.taskId)
@@ -99,6 +109,11 @@ export function useDownloadManager() {
   // 移除进度监听
   function removeProgressListener() {
     window.electronAPI?.removeDownloadProgressListener()
+    // 停止文件夹速度更新定时器
+    if (folderSpeedTimer) {
+      clearInterval(folderSpeedTimer)
+      folderSpeedTimer = null
+    }
   }
 
   // 取消文件夹的所有正在进行的下载

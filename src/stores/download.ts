@@ -182,11 +182,7 @@ export const useDownloadStore = defineStore('download', () => {
       subFile.downloadedSize = downloadedSize
       subFile.status = 'downloading'
 
-      // 更新文件夹总体进度
-      // 速度为所有正在下载的子文件速度之和
-      task.speed = task.subFiles.reduce((sum, sf) => {
-        return sum + (sf.status === 'downloading' ? sf.speed : 0)
-      }, 0)
+      // 更新文件夹总体进度（不更新速度，速度由独立定时器计算）
       task.downloadedSize = task.subFiles.reduce((sum, sf) => sum + sf.downloadedSize, 0)
       task.progress = task.totalSize > 0 ? (task.downloadedSize / task.totalSize) * 100 : 0
       task.currentFileIndex = fileIndex
@@ -195,6 +191,17 @@ export const useDownloadStore = defineStore('download', () => {
         task.status = 'downloading'
       }
     }
+  }
+
+  // 更新所有文件夹任务的总速度（由定时器调用，每秒一次）
+  function updateAllFolderSpeeds() {
+    downloadTasks.value.forEach(task => {
+      if (task.isFolder && task.subFiles && task.status === 'downloading') {
+        task.speed = task.subFiles.reduce((sum, sf) => {
+          return sum + (sf.status === 'downloading' ? sf.speed : 0)
+        }, 0)
+      }
+    })
   }
 
   // 标记文件夹中的子文件完成
@@ -661,6 +668,7 @@ export const useDownloadStore = defineStore('download', () => {
     getFailedSubFilesFromFailed,
     removeFromFailed,
     clearFailed,
-    retryAllFailed
+    retryAllFailed,
+    updateAllFolderSpeeds
   }
 })
