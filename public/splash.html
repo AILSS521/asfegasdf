@@ -190,25 +190,53 @@
     async function init() {
       addLog('开始初始化...');
 
-      await new Promise(r => setTimeout(r, 500));
-      addLog('开始更新检查...');
+      await new Promise(r => setTimeout(r, 300));
+      addLog('检查更新中...');
 
       try {
-        const result = await window.electronSplashAPI?.checkVersion();
+        const versionResult = await window.electronSplashAPI?.checkVersion();
 
-        if (result.success) {
-          addLog('版本检查通过', 'success');
-          await new Promise(r => setTimeout(r, 300));
-          fadeOutAndProceed();
-        } else if (result.needUpdate) {
-          addLog('请更新软件', 'error');
+        if (!versionResult.success) {
+          if (versionResult.needUpdate) {
+            addLog('请更新软件', 'error');
+          } else {
+            addLog('更新检查失败', 'error');
+          }
           startCountdown(10, fadeOutAndClose);
-        } else {
-          addLog('更新检查失败，10秒后自动退出', 'error');
-          startCountdown(10, fadeOutAndClose);
+          return;
         }
+
+        addLog('版本检查通过', 'success');
+        await new Promise(r => setTimeout(r, 200));
+
+        // 初始化下载器
+        addLog('启动下载器中...');
+        const initResult = await window.electronSplashAPI?.initDownloader();
+
+        if (!initResult.success) {
+          addLog('下载器启动失败: ' + (initResult.error || '未知错误'), 'error');
+          startCountdown(10, fadeOutAndClose);
+          return;
+        }
+
+        addLog('下载器已启动', 'success');
+        await new Promise(r => setTimeout(r, 200));
+
+        // 测试下载器连接
+        addLog('测试下载器连接中...');
+        const testResult = await window.electronSplashAPI?.testDownloader();
+
+        if (!testResult.success) {
+          addLog('下载器连接失败: ' + (testResult.error || '未知错误'), 'error');
+          startCountdown(10, fadeOutAndClose);
+          return;
+        }
+
+        addLog('下载器连接正常', 'success');
+        await new Promise(r => setTimeout(r, 300));
+        fadeOutAndProceed();
       } catch (error) {
-        addLog('更新检查失败，10秒后自动退出', 'error');
+        addLog('初始化失败，10秒后自动退出', 'error');
         startCountdown(10, fadeOutAndClose);
       }
     }

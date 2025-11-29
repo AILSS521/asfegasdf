@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import * as http from 'http'
+import * as net from 'net'
 import * as path from 'path'
 import * as fs from 'fs'
 import { spawn, ChildProcess } from 'child_process'
@@ -7,8 +8,10 @@ import { app } from 'electron'
 
 // aria2 RPC 配置
 const RPC_HOST = '127.0.0.1'
-const RPC_PORT = 6800
 const RPC_SECRET = 'baidu_download_secret_' + Math.random().toString(36).substring(7)
+const PORT_RANGE_START = 16800
+const PORT_RANGE_END = 16899
+const MAX_PORT_RETRIES = 10
 
 // aria2 下载状态
 export type Aria2Status = 'active' | 'waiting' | 'paused' | 'error' | 'complete' | 'removed'
@@ -50,9 +53,46 @@ export class Aria2Client extends EventEmitter {
   private gidMap: Map<string, string> = new Map() // gid -> taskId
   private progressTimer: NodeJS.Timeout | null = null
   private startPromise: Promise<void> | null = null
+  private rpcPort: number = 0
 
   constructor() {
     super()
+  }
+
+  // 生成随机端口
+  private getRandomPort(): number {
+    return Math.floor(Math.random() * (PORT_RANGE_END - PORT_RANGE_START + 1)) + PORT_RANGE_START
+  }
+
+  // 检查端口是否可用
+  private checkPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const server = net.createServer()
+      server.once('error', () => {
+        resolve(false)
+      })
+      server.once('listening', () => {
+        server.close()
+        resolve(true)
+      })
+      server.listen(port, RPC_HOST)
+    })
+  }
+
+  // 查找可用端口
+  private async findAvailablePort(): Promise<number> {
+    for (let i = 0; i < MAX_PORT_RETRIES; i++) {
+      const port = this.getRandomPort()
+      if (await this.checkPortAvailable(port)) {
+        return port
+      }
+    }
+    throw new Error('无法找到可用端口')
+  }
+
+  // 获取当前 RPC 端口
+  getRpcPort(): number {
+    return this.rpcPort
   }
 
   // 获取 aria2c 可执行文件路径
@@ -96,20 +136,14 @@ export class Aria2Client extends EventEmitter {
       fs.writeFileSync(sessionPath, '', 'utf-8')
     }
 
-    // 检查 aria2 是否已在运行
-    try {
-      await this.getVersion()
-      this.isReady = true
-      this.startProgressMonitor()
-      return
-    } catch {
-      // aria2 未运行，继续启动
-    }
+    // 查找可用端口
+    this.rpcPort = await this.findAvailablePort()
+    console.log(`[aria2] 使用端口: ${this.rpcPort}`)
 
     // 启动 aria2 进程
     const args = [
       '--enable-rpc',
-      `--rpc-listen-port=${RPC_PORT}`,
+      `--rpc-listen-port=${this.rpcPort}`,
       '--rpc-listen-all=false',
       `--rpc-secret=${RPC_SECRET}`,
       '--rpc-allow-origin-all=true',
@@ -210,7 +244,7 @@ export class Aria2Client extends EventEmitter {
 
       const options = {
         hostname: RPC_HOST,
-        port: RPC_PORT,
+        port: this.rpcPort,
         path: '/jsonrpc',
         method: 'POST',
         headers: {

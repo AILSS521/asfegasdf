@@ -303,6 +303,33 @@ ipcMain.handle('splash:checkVersion', async () => {
   return await checkVersion()
 })
 
+ipcMain.handle('splash:initDownloader', async () => {
+  try {
+    await downloadManager.init()
+    return { success: true }
+  } catch (error: any) {
+    console.error('初始化下载器失败:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('splash:testDownloader', async () => {
+  try {
+    if (!downloadManager.isReady()) {
+      return { success: false, error: '下载器未就绪' }
+    }
+    // 测试获取 aria2 版本来验证连接
+    const status = await downloadManager.getTaskStatus('__test__')
+    return { success: true }
+  } catch (error: any) {
+    // 即使获取状态失败，只要下载器已就绪就算成功
+    if (downloadManager.isReady()) {
+      return { success: true }
+    }
+    return { success: false, error: error.message }
+  }
+})
+
 ipcMain.handle('splash:proceed', () => {
   // 关闭启动画面，打开主窗口
   if (splashWindow) {
