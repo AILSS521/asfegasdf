@@ -149,7 +149,11 @@
           <template v-if="task.status === 'downloading' || (task.status === 'paused' && task.progress > 0)">
             <div class="status-progress">
               <div class="progress-info">
-                <span class="progress-percent">{{ task.progress.toFixed(1) }}%</span>
+                <!-- 文件夹显示剩余数量，普通文件显示百分比 -->
+                <span class="progress-percent" v-if="task.isFolder">
+                  剩余数量：{{ (task.totalCount || 0) - (task.completedCount || 0) }}
+                </span>
+                <span class="progress-percent" v-else>{{ task.progress.toFixed(1) }}%</span>
                 <span class="progress-speed" v-if="task.status === 'downloading'">{{ formatSpeed(task.speed) }}</span>
                 <span class="progress-paused" v-else>已暂停</span>
               </div>
