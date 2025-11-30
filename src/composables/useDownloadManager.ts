@@ -189,6 +189,16 @@ export function useDownloadManager() {
     }
 
     try {
+      // 计算相对于分享根目录的路径（用于远程 API）
+      const apiDirPath = path.dirname(task.file.path)
+      let apiDir = '/'
+      if (session.basePath && apiDirPath.startsWith(session.basePath)) {
+        apiDir = apiDirPath.slice(session.basePath.length) || '/'
+        if (apiDir !== '/' && !apiDir.startsWith('/')) {
+          apiDir = '/' + apiDir
+        }
+      }
+
       // 获取下载链接
       const linkData = await api.getDownloadLink({
         code: session.code,
@@ -197,7 +207,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: task.file.fs_id,
         surl: session.surl,
-        dir: path.dirname(task.file.path) || '/',
+        dir: apiDir,
         pwd: session.pwd
       })
 
@@ -359,6 +369,16 @@ export function useDownloadManager() {
         return
       }
 
+      // 计算相对于分享根目录的路径（用于远程 API）
+      const apiDirPath = path.dirname(subFile.file.path)
+      let apiDir = '/'
+      if (session.basePath && apiDirPath.startsWith(session.basePath)) {
+        apiDir = apiDirPath.slice(session.basePath.length) || '/'
+        if (apiDir !== '/' && !apiDir.startsWith('/')) {
+          apiDir = '/' + apiDir
+        }
+      }
+
       // 获取下载链接
       const linkData = await api.getDownloadLink({
         code: session.code,
@@ -367,7 +387,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: subFile.file.fs_id,
         surl: session.surl,
-        dir: path.dirname(subFile.file.path) || '/',
+        dir: apiDir,
         pwd: session.pwd
       })
 

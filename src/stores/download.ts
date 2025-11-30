@@ -63,7 +63,8 @@ export const useDownloadStore = defineStore('download', () => {
       shareid: sessionData.value.shareid,
       randsk: sessionData.value.randsk,
       surl: sessionData.value.surl,
-      pwd: sessionData.value.pwd
+      pwd: sessionData.value.pwd,
+      basePath: basePath.value // 保存分享根目录路径
     } : undefined
 
     const newTasks: DownloadTask[] = files.map(file => ({
@@ -92,7 +93,8 @@ export const useDownloadStore = defineStore('download', () => {
       shareid: sessionData.value.shareid,
       randsk: sessionData.value.randsk,
       surl: sessionData.value.surl,
-      pwd: sessionData.value.pwd
+      pwd: sessionData.value.pwd,
+      basePath: basePath.value // 保存分享根目录路径
     } : undefined
 
     // 计算总大小

@@ -43,6 +43,7 @@ export interface TaskSessionData {
   randsk: string
   surl: string
   pwd: string
+  basePath: string // 分享链接的根目录路径，用于计算相对路径
 }
 
 // 下载任务
