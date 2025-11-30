@@ -27,6 +27,9 @@ function getApiDir(filePath: string, basePath: string): string {
 // 用于跟踪文件夹任务中当前正在下载的子文件
 const folderDownloadMap = ref<Map<string, { taskId: string; fileIndex: number }>>(new Map())
 
+// 是否有任务正在获取下载链接（限制同时只能有一个）
+const isFetchingLink = ref(false)
+
 // 文件夹速度更新定时器
 let folderSpeedTimer: ReturnType<typeof setInterval> | null = null
 
@@ -179,8 +182,13 @@ export function useDownloadManager() {
       return
     }
 
-    // 立即继续处理队列中的其他任务
-    setTimeout(processQueue, 50)
+    // 检查是否有任务正在获取下载链接（同时只能有一个）
+    if (isFetchingLink.value) {
+      return
+    }
+
+    // 标记正在获取链接
+    isFetchingLink.value = true
 
     if (nextTask.isFolder) {
       await processFolderTask(nextTask)
@@ -198,6 +206,8 @@ export function useDownloadManager() {
     if (!session) {
       task.error = '会话数据丢失，请重新添加下载任务'
       downloadStore.moveToCompleted(task, false)
+      // 释放锁并处理下一个任务
+      isFetchingLink.value = false
       processQueue()
       return
     }
@@ -219,6 +229,9 @@ export function useDownloadManager() {
       // 获取链接后检查任务是否被暂停或已不存在
       const currentTask = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!currentTask || currentTask.status === 'paused' || currentTask.status === 'error') {
+        // 任务被暂停或取消，释放锁并处理下一个任务
+        isFetchingLink.value = false
+        processQueue()
         return
       }
 
@@ -251,6 +264,9 @@ export function useDownloadManager() {
       // 开始下载前再次检查任务状态
       const taskBeforeDownload = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskBeforeDownload || taskBeforeDownload.status === 'paused' || taskBeforeDownload.status === 'error') {
+        // 任务被暂停或取消，释放锁并处理下一个任务
+        isFetchingLink.value = false
+        processQueue()
         return
       }
 
@@ -265,6 +281,9 @@ export function useDownloadManager() {
       if (result?.success) {
         downloadStore.updateTaskStatus(task.id, 'downloading')
         errorCount.value = 0
+        // 下载已开始，释放锁并处理下一个任务
+        isFetchingLink.value = false
+        processQueue()
       } else {
         throw new Error(result?.error || '启动下载失败')
       }
@@ -278,8 +297,12 @@ export function useDownloadManager() {
         task.error = error.message || '获取下载链接失败'
         downloadStore.moveToCompleted(task, false)
         errorCount.value++
+        // 失败时释放锁并处理下一个任务
+        isFetchingLink.value = false
         processQueue()
       } else {
+        // 重试时释放锁
+        isFetchingLink.value = false
         setTimeout(() => {
           task.status = 'waiting'
           processQueue()
@@ -296,6 +319,9 @@ export function useDownloadManager() {
     } else {
       downloadStore.updateTaskStatus(task.id, 'processing')
     }
+    // 文件夹任务已开始处理，释放锁并处理下一个任务
+    isFetchingLink.value = false
+    processQueue()
     // 并行启动多个子文件下载
     await fillFolderDownloadSlots(task)
   }
