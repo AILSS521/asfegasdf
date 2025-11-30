@@ -190,8 +190,8 @@ export function useDownloadManager() {
 
     try {
       // 获取下载链接
-      // 注意：dir 参数应该始终为 '/'，因为 fs_id 已经唯一标识了文件
-      // 之前尝试计算相对路径会导致子目录文件下载失败
+      // dir 参数需要传递文件实际所在的目录，否则远程API无法在数据库中找到该fs_id
+      const fileDir = path.dirname(task.file.path) || '/'
       const linkData = await api.getDownloadLink({
         code: session.code,
         randsk: session.randsk,
@@ -199,7 +199,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: task.file.fs_id,
         surl: session.surl,
-        dir: '/',
+        dir: fileDir,
         pwd: session.pwd
       })
 
@@ -362,8 +362,8 @@ export function useDownloadManager() {
       }
 
       // 获取下载链接
-      // 注意：dir 参数应该始终为 '/'，因为 fs_id 已经唯一标识了文件
-      // 之前尝试计算相对路径会导致子目录文件下载失败
+      // dir 参数需要传递文件实际所在的目录，否则远程API无法在数据库中找到该fs_id
+      const subFileDir = path.dirname(subFile.file.path) || '/'
       const linkData = await api.getDownloadLink({
         code: session.code,
         randsk: session.randsk,
@@ -371,7 +371,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: subFile.file.fs_id,
         surl: session.surl,
-        dir: '/',
+        dir: subFileDir,
         pwd: session.pwd
       })
 
