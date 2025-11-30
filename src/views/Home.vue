@@ -537,20 +537,11 @@ async function fetchFileList(isInitial: boolean = false) {
 
     // 首次获取时，根据返回的文件路径自动确定基础路径
     if (isInitial && data.list.length > 0) {
-      const firstItem = data.list[0]
-      const firstFilePath = firstItem.path
+      const firstFilePath = data.list[0].path
       // 获取文件的父目录作为基础路径（用于显示转换）
       const parentDir = firstFilePath.substring(0, firstFilePath.lastIndexOf('/')) || '/'
-
-      // 如果分享的是单个文件夹（parentDir 为根目录且第一项是目录），
-      // 则 basePath 应该是该文件夹本身，而不是根目录
-      if (parentDir === '/' && firstItem.isdir === 1 && data.list.length === 1) {
-        basePath.value = firstFilePath
-        currentPath.value = firstFilePath
-      } else {
-        basePath.value = parentDir
-        currentPath.value = parentDir
-      }
+      basePath.value = parentDir
+      currentPath.value = parentDir
     }
 
     // 保存会话数据到 store
