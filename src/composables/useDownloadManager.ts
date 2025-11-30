@@ -10,10 +10,18 @@ const MAX_FOLDER_CONCURRENT = 3  // 文件夹内子文件最大并行数
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
 
-// 获取文件所在目录的完整路径
-// 百度API的dir参数需要的是文件所在目录的完整百度网盘路径
-function getFileDir(filePath: string): string {
-  return path.dirname(filePath) || '/'
+// 获取用于API请求的目录路径
+// 规则：
+// - 如果文件在分享根目录下（fileDir === basePath），返回 "/"
+// - 如果文件在子目录下，返回完整的目录路径
+function getApiDir(filePath: string, basePath: string): string {
+  const fileDir = path.dirname(filePath)
+  // 文件在分享根目录下，dir 应该是 "/"
+  if (fileDir === basePath) {
+    return '/'
+  }
+  // 文件在子目录下，返回完整的目录路径
+  return fileDir || '/'
 }
 
 // 用于跟踪文件夹任务中当前正在下载的子文件
@@ -196,7 +204,7 @@ export function useDownloadManager() {
 
     try {
       // 获取下载链接
-      // dir 参数需要传递文件所在目录的完整百度网盘路径
+      // dir 参数：分享根目录下的文件用 "/"，子目录下的文件用完整路径
       const linkData = await api.getDownloadLink({
         code: session.code,
         randsk: session.randsk,
@@ -204,7 +212,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: task.file.fs_id,
         surl: session.surl,
-        dir: getFileDir(task.file.path),
+        dir: getApiDir(task.file.path, session.basePath),
         pwd: session.pwd
       })
 
@@ -367,7 +375,7 @@ export function useDownloadManager() {
       }
 
       // 获取下载链接
-      // dir 参数需要传递文件所在目录的完整百度网盘路径
+      // dir 参数：分享根目录下的文件用 "/"，子目录下的文件用完整路径
       const linkData = await api.getDownloadLink({
         code: session.code,
         randsk: session.randsk,
@@ -375,7 +383,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: subFile.file.fs_id,
         surl: session.surl,
-        dir: getFileDir(subFile.file.path),
+        dir: getApiDir(subFile.file.path, session.basePath),
         pwd: session.pwd
       })
 
