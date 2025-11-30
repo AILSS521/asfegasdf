@@ -189,17 +189,9 @@ export function useDownloadManager() {
     }
 
     try {
-      // 计算相对于分享根目录的路径（用于远程 API）
-      const apiDirPath = path.dirname(task.file.path)
-      let apiDir = '/'
-      if (session.basePath && apiDirPath.startsWith(session.basePath)) {
-        apiDir = apiDirPath.slice(session.basePath.length) || '/'
-        if (apiDir !== '/' && !apiDir.startsWith('/')) {
-          apiDir = '/' + apiDir
-        }
-      }
-
       // 获取下载链接
+      // 注意：dir 参数应该始终为 '/'，因为 fs_id 已经唯一标识了文件
+      // 之前尝试计算相对路径会导致子目录文件下载失败
       const linkData = await api.getDownloadLink({
         code: session.code,
         randsk: session.randsk,
@@ -207,7 +199,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: task.file.fs_id,
         surl: session.surl,
-        dir: apiDir,
+        dir: '/',
         pwd: session.pwd
       })
 
@@ -369,17 +361,9 @@ export function useDownloadManager() {
         return
       }
 
-      // 计算相对于分享根目录的路径（用于远程 API）
-      const apiDirPath = path.dirname(subFile.file.path)
-      let apiDir = '/'
-      if (session.basePath && apiDirPath.startsWith(session.basePath)) {
-        apiDir = apiDirPath.slice(session.basePath.length) || '/'
-        if (apiDir !== '/' && !apiDir.startsWith('/')) {
-          apiDir = '/' + apiDir
-        }
-      }
-
       // 获取下载链接
+      // 注意：dir 参数应该始终为 '/'，因为 fs_id 已经唯一标识了文件
+      // 之前尝试计算相对路径会导致子目录文件下载失败
       const linkData = await api.getDownloadLink({
         code: session.code,
         randsk: session.randsk,
@@ -387,7 +371,7 @@ export function useDownloadManager() {
         shareid: session.shareid,
         fs_id: subFile.file.fs_id,
         surl: session.surl,
-        dir: apiDir,
+        dir: '/',
         pwd: session.pwd
       })
 
