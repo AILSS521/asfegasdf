@@ -189,6 +189,7 @@ function toggleSelect(taskId: string) {
 
 function retryTask(taskId: string) {
   downloadStore.retryFailedSubFilesFromFailed(taskId)
+  downloadManager.resetErrorCount()
   downloadManager.processQueue()
 }
 
@@ -201,6 +202,7 @@ function showFailedFiles(task: DownloadTask) {
 function retryCurrentTask() {
   if (currentFailedTaskId.value) {
     downloadStore.retryFailedSubFilesFromFailed(currentFailedTaskId.value)
+    downloadManager.resetErrorCount()
     downloadManager.processQueue()
     showFailedModal.value = false
   }
@@ -213,8 +215,9 @@ function removeTask(taskId: string) {
 
 function retrySelected() {
   const ids = Array.from(selectedIds.value)
-  ids.forEach(id => downloadStore.retryFromFailed(id))
+  ids.forEach(id => downloadStore.retryFailedSubFilesFromFailed(id))
   selectedIds.value.clear()
+  downloadManager.resetErrorCount()
   downloadManager.processQueue()
 }
 
@@ -226,6 +229,7 @@ function clearSelected() {
 
 function retryAll() {
   downloadStore.retryAllFailed()
+  downloadManager.resetErrorCount()
   downloadManager.processQueue()
 }
 

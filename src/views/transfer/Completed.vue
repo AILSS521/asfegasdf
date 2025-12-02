@@ -240,6 +240,7 @@ function hasFailedSubFiles(task: DownloadTask): boolean {
 // 重新下载整个任务
 function retryTask(task: DownloadTask) {
   downloadStore.retryFromCompleted(task.id)
+  downloadManager.resetErrorCount()
   downloadManager.processQueue()
   router.push('/transfer/downloading')
 }
@@ -247,6 +248,7 @@ function retryTask(task: DownloadTask) {
 // 仅重试失败的文件
 function retryFailedFiles(task: DownloadTask) {
   downloadStore.retryFailedSubFiles(task.id)
+  downloadManager.resetErrorCount()
   downloadManager.processQueue()
   router.push('/transfer/downloading')
 }
@@ -270,6 +272,7 @@ function closeFailedModal() {
 function retryFailedFromModal() {
   if (currentFailedTaskId.value) {
     downloadStore.retryFailedSubFiles(currentFailedTaskId.value)
+    downloadManager.resetErrorCount()
     downloadManager.processQueue()
     closeFailedModal()
     router.push('/transfer/downloading')
