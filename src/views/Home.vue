@@ -187,6 +187,12 @@
             >
               下载{{ selectedIds.size > 0 ? ` (${selectedIds.size})` : '' }}
             </button>
+            <!-- 收起按钮 -->
+            <button class="btn-collapse" @click="collapseFloatBar" title="收起">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M19 13H5v-2h14v2z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -196,12 +202,9 @@
     <div
       class="collapsed-download-btn"
       :class="{ visible: isFloatBarCollapsed }"
-      @click="handleCollapsedDownload"
-      @mouseenter="expandFloatBar"
+      @click="expandFloatBar"
     >
-      <svg viewBox="0 0 24 24" width="24" height="24">
-        <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-      </svg>
+      <span class="code-display">{{ code || '?' }}</span>
       <span class="badge" v-if="selectedIds.size > 0">{{ selectedIds.size > 99 ? '99+' : selectedIds.size }}</span>
     </div>
 
@@ -768,6 +771,11 @@ function expandFloatBar() {
   isFloatBarCollapsed.value = false
 }
 
+// 收起悬浮框
+function collapseFloatBar() {
+  isFloatBarCollapsed.value = true
+}
+
 // 点击收起状态的按钮时下载选中文件
 function handleCollapsedDownload() {
   if (selectedIds.value.size > 0) {
@@ -1203,6 +1211,15 @@ onUnmounted(() => {
     pointer-events: auto;
   }
 
+  .code-display {
+    font-size: 14px;
+    font-weight: 600;
+    max-width: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .badge {
     position: absolute;
     top: -4px;
@@ -1302,6 +1319,23 @@ onUnmounted(() => {
 
     &:hover:not(:disabled) {
       background: $primary-hover;
+    }
+  }
+
+  .btn-collapse {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: $text-secondary;
+    border-radius: 50%;
+
+    &:hover {
+      background: $bg-hover;
+      color: $text-primary;
     }
   }
 }
