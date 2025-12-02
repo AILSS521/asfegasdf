@@ -776,16 +776,6 @@ function collapseFloatBar() {
   isFloatBarCollapsed.value = true
 }
 
-// 点击收起状态的按钮时下载选中文件
-function handleCollapsedDownload() {
-  if (selectedIds.value.size > 0) {
-    downloadSelected()
-  } else {
-    // 没有选中文件时展开悬浮框
-    expandFloatBar()
-  }
-}
-
 // 监听文件列表变化，重置滚动状态
 watch(() => fileList.value.length, async () => {
   await nextTick()
