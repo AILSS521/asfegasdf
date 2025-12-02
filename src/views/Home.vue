@@ -39,7 +39,7 @@
       </div>
 
       <!-- 文件表格 -->
-      <div class="file-table">
+      <div class="file-table" ref="fileTableRef">
         <div class="table-header">
           <div class="col-checkbox header-checkbox">
             <input
@@ -164,7 +164,8 @@
     </div>
 
     <!-- 底部悬浮操作栏 -->
-    <div class="bottom-float-bar">
+    <div class="bottom-float-bar" :class="{ collapsed: isFloatBarCollapsed }">
+      <!-- 展开状态的输入框 -->
       <div class="float-card">
         <div class="input-wrapper">
           <input
@@ -191,6 +192,19 @@
       </div>
     </div>
 
+    <!-- 收起状态的圆形按钮（独立定位） -->
+    <div
+      class="collapsed-download-btn"
+      :class="{ visible: isFloatBarCollapsed }"
+      @click="handleCollapsedDownload"
+      @mouseenter="expandFloatBar"
+    >
+      <svg viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+      </svg>
+      <span class="badge" v-if="selectedIds.size > 0">{{ selectedIds.size > 99 ? '99+' : selectedIds.size }}</span>
+    </div>
+
     <!-- 错误提示 -->
     <div class="error-toast" v-if="errorMessage">
       {{ errorMessage }}
@@ -199,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onUnmounted } from 'vue'
+import { ref, computed, reactive, onUnmounted, onMounted, nextTick, watch } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useDownloadStore } from '@/stores/download'
 import { useDownloadManager } from '@/composables/useDownloadManager'
@@ -234,6 +248,11 @@ const loading = ref(false)
 const errorMessage = ref('')
 const hoverFileId = ref<number | string | null>(null)
 const selectedIds = ref<Set<number | string>>(new Set())
+
+// 滚动相关状态
+const fileTableRef = ref<HTMLElement | null>(null)
+const isScrolledToBottom = ref(false)
+const isFloatBarCollapsed = ref(false)
 
 // 排序状态
 const sortKey = ref<'name' | 'size' | 'type' | 'time' | null>(null)
@@ -722,10 +741,72 @@ function formatTime(timestamp: number): string {
   return dayjs(timestamp * 1000).format('YYYY.MM.DD HH:mm')
 }
 
+// 滚动检测 - 检测是否滚动到底部
+function handleScroll() {
+  if (!fileTableRef.value) return
+
+  const { scrollTop, scrollHeight, clientHeight } = fileTableRef.value
+  // 判断是否滚动到底部（留10px的容差）
+  const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10
+  // 判断是否离开底部区域（向上滚动超过50px）
+  const hasLeftBottom = scrollTop + clientHeight < scrollHeight - 50
+
+  if (isAtBottom && !isScrolledToBottom.value) {
+    isScrolledToBottom.value = true
+    // 滚动到底部时收起悬浮框
+    isFloatBarCollapsed.value = true
+  } else if (hasLeftBottom && isScrolledToBottom.value) {
+    isScrolledToBottom.value = false
+    // 离开底部区域时自动展开悬浮框
+    isFloatBarCollapsed.value = false
+  }
+}
+
+// 展开悬浮框
+function expandFloatBar() {
+  isFloatBarCollapsed.value = false
+}
+
+// 点击收起状态的按钮时下载选中文件
+function handleCollapsedDownload() {
+  if (selectedIds.value.size > 0) {
+    downloadSelected()
+  } else {
+    // 没有选中文件时展开悬浮框
+    expandFloatBar()
+  }
+}
+
+// 监听文件列表变化，重新绑定滚动监听
+watch(() => fileList.value.length, async (newLength, oldLength) => {
+  await nextTick()
+  // 文件列表变化时重置滚动状态
+  isScrolledToBottom.value = false
+  isFloatBarCollapsed.value = false
+
+  // 如果从无到有，需要重新绑定滚动监听
+  if (oldLength === 0 && newLength > 0 && fileTableRef.value) {
+    fileTableRef.value.addEventListener('scroll', handleScroll)
+  }
+})
+
+// 组件挂载时绑定滚动监听
+onMounted(() => {
+  // 使用 nextTick 确保 DOM 已渲染
+  nextTick(() => {
+    if (fileTableRef.value) {
+      fileTableRef.value.addEventListener('scroll', handleScroll)
+    }
+  })
+})
+
 // 组件卸载时清理事件监听
 onUnmounted(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
+  if (fileTableRef.value) {
+    fileTableRef.value.removeEventListener('scroll', handleScroll)
+  }
 })
 </script>
 
@@ -1077,6 +1158,18 @@ onUnmounted(() => {
   transform: translateX(-50%);
   z-index: 10;
   pointer-events: none; // 让底层内容可点击
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.collapsed {
+    .float-card {
+      opacity: 0;
+      transform: scale(0.8) translateX(100px);
+      pointer-events: none;
+    }
+  }
 }
 
 .float-card {
@@ -1086,6 +1179,77 @@ onUnmounted(() => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
   pointer-events: auto;
   padding: 4px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1) translateX(0);
+}
+
+.collapsed-download-btn {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: $primary-color;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0) translateX(20px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+
+  &:hover {
+    background: $primary-hover;
+    transform: scale(1.1) translateX(0);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  &:active {
+    transform: scale(0.95) translateX(0);
+  }
+
+  &.visible {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+    pointer-events: auto;
+  }
+
+  .badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #ff4757;
+    color: white;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(255, 71, 87, 0.4);
+    animation: badgePop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@keyframes badgePop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .input-wrapper {
