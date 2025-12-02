@@ -54,8 +54,27 @@ export const useDownloadStore = defineStore('download', () => {
     currentPath.value = path
   }
 
+  // 获取队列中所有文件的 fs_id（包括文件夹中的子文件）
+  function getQueuedFsIds(): Set<string> {
+    const fsIds = new Set<string>()
+    downloadTasks.value.forEach(task => {
+      // 添加任务本身的 fs_id
+      fsIds.add(task.file.fs_id)
+      // 如果是文件夹，添加所有子文件的 fs_id
+      if (task.isFolder && task.subFiles) {
+        task.subFiles.forEach(sf => fsIds.add(sf.file.fs_id))
+      }
+    })
+    return fsIds
+  }
+
   // 添加单个文件任务到下载列表
   function addToDownload(files: FileItem[], downloadBasePath: string | null = null) {
+    // 过滤掉已在队列中的文件
+    const queuedFsIds = getQueuedFsIds()
+    const newFiles = files.filter(f => !queuedFsIds.has(f.fs_id))
+    if (newFiles.length === 0) return
+
     // 保存当前会话数据到任务中，避免被新下载编码覆盖
     const taskSession: TaskSessionData | undefined = sessionData.value ? {
       code: currentCode.value,
@@ -67,7 +86,7 @@ export const useDownloadStore = defineStore('download', () => {
       basePath: basePath.value // 保存分享根目录路径
     } : undefined
 
-    const newTasks: DownloadTask[] = files.map(file => ({
+    const newTasks: DownloadTask[] = newFiles.map(file => ({
       id: `${Date.now()}-${file.fs_id}`,
       file,
       status: 'waiting' as TaskStatus,
@@ -86,6 +105,10 @@ export const useDownloadStore = defineStore('download', () => {
 
   // 添加文件夹任务到下载列表
   function addFolderToDownload(folder: FileItem, files: FileItem[], downloadBasePath: string) {
+    // 检查文件夹是否已在队列中
+    const queuedFsIds = getQueuedFsIds()
+    if (queuedFsIds.has(folder.fs_id)) return
+
     // 保存当前会话数据到任务中，避免被新下载编码覆盖
     const taskSession: TaskSessionData | undefined = sessionData.value ? {
       code: currentCode.value,
