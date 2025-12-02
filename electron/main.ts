@@ -9,7 +9,7 @@ let mainWindow: BrowserWindow | null = null
 let splashWindow: BrowserWindow | null = null
 
 // 当前客户端版本
-const CLIENT_VERSION = '1.0.4'
+const CLIENT_VERSION = '1.0.5'
 // 版本检查API地址
 const VERSION_API_URL = 'https://download.linglong521.cn/version.php'
 
@@ -415,10 +415,28 @@ ipcMain.handle('splash:close', () => {
   app.quit()
 })
 
-// 应用生命周期
-app.whenReady().then(() => {
-  createSplashWindow()
-})
+// 单实例锁，防止多开
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  // 如果获取锁失败，说明已有实例在运行，退出当前实例
+  app.quit()
+} else {
+  // 当尝试启动第二个实例时，聚焦到已有窗口
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    } else if (splashWindow) {
+      splashWindow.focus()
+    }
+  })
+
+  // 应用生命周期
+  app.whenReady().then(() => {
+    createSplashWindow()
+  })
+}
 
 app.on('window-all-closed', async () => {
   // 停止 aria2 进程

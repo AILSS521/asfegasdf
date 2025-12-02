@@ -55,8 +55,8 @@ export const useDownloadStore = defineStore('download', () => {
   }
 
   // 获取队列中所有文件的 fs_id（包括文件夹中的子文件）
-  function getQueuedFsIds(): Set<string> {
-    const fsIds = new Set<string>()
+  function getQueuedFsIds(): Set<string | number> {
+    const fsIds = new Set<string | number>()
     downloadTasks.value.forEach(task => {
       // 添加任务本身的 fs_id
       fsIds.add(task.file.fs_id)
