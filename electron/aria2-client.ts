@@ -166,6 +166,8 @@ export class Aria2Client extends EventEmitter {
       '--console-log-level=warn',
       '--summary-interval=0',
       '--disk-cache=64M',
+      '--async-dns=true',
+      '--async-dns-server=119.29.29.29',
     ]
 
     return new Promise((resolve, reject) => {
