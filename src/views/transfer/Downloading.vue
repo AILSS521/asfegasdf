@@ -296,6 +296,8 @@ async function deleteTask(id: string) {
       // 等待中的直接删除
       downloadStore.removeFromDownload([id])
     }
+    // 删除/取消后处理等待队列
+    downloadManager.processQueue()
   }
   selectedIds.value.delete(id)
 }
