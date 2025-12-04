@@ -60,6 +60,8 @@
 
     .log-area {
       min-height: 60px;
+      max-height: 100px;
+      overflow-y: auto;
     }
 
     .log-line {
@@ -151,6 +153,7 @@
       line.style.animationDelay = `${logArea.children.length * 0.1}s`;
       line.textContent = text;
       logArea.appendChild(line);
+      logArea.scrollTop = logArea.scrollHeight;
     }
 
     // 开始倒计时
