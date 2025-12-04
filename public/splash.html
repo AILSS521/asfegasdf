@@ -229,12 +229,18 @@
         await new Promise(r => setTimeout(r, 300));
 
         // 测试下载器连接
-        addLog('A');
-        await new Promise(r => setTimeout(r, 1000));
-        addLog('B');
-        await new Promise(r => setTimeout(r, 1000));
-        addLog('C');
-        await new Promise(r => setTimeout(r, 1000));
+        addLog('连接下载器...');
+        await new Promise(r => setTimeout(r, 400));
+        const testResult = await window.electronSplashAPI?.testDownloader();
+
+        if (!testResult.success) {
+          addLog('连接失败', 'error');
+          startCountdown(10, fadeOutAndClose);
+          return;
+        }
+
+        addLog('初始化完成', 'success');
+        await new Promise(r => setTimeout(r, 600));
         fadeOutAndProceed();
       } catch (error) {
         addLog('初始化失败，10秒后自动退出', 'error');
