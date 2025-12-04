@@ -483,6 +483,15 @@ ipcMain.handle('splash:checkVersion', async () => {
 ipcMain.handle('splash:initDownloader', async () => {
   try {
     await downloadManager.init()
+
+    // 选择最优下载线路
+    console.log('[route] 开始测试下载线路...')
+    const route = await selectBestRoute()
+    if (route) {
+      aria2Client.setHostMapping('allall02.baidupcs.com', route.ip)
+      console.log(`[route] 已选择线路: ${route.name} (${route.ip}) 延迟: ${route.latency}ms`)
+    }
+
     return { success: true }
   } catch (error: any) {
     console.error('初始化下载器失败:', error)
