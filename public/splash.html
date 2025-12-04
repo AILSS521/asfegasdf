@@ -207,7 +207,6 @@
         }
 
         addLog('版本检查通过', 'success');
-        addLog('v2-test', 'normal');
         await new Promise(r => setTimeout(r, 200));
 
         // 初始化下载器
@@ -221,20 +220,16 @@
         }
 
         addLog('下载器已启动', 'success');
-        addLog('route=' + JSON.stringify(initResult.route), 'normal');
-        await new Promise(r => setTimeout(r, 500));
 
         // 显示选择的线路
         if (initResult.route) {
           const latencyText = initResult.route.latency >= 0 ? `${initResult.route.latency}ms` : '超时';
-          addLog(`线路: ${initResult.route.name} ${latencyText}`, 'success');
-        } else {
-          addLog('线路: 未知', 'normal');
+          addLog(`线路: ${initResult.route.name} (${latencyText})`, 'success');
         }
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 300));
 
         // 测试下载器连接
-        addLog('测试连接中...');
+        addLog('测试下载器连接...');
         const testResult = await window.electronSplashAPI?.testDownloader();
 
         if (!testResult.success) {
