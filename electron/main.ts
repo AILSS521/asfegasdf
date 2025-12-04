@@ -3,7 +3,9 @@ import path from 'path'
 import fs from 'fs'
 import http from 'http'
 import https from 'https'
+import net from 'net'
 import { downloadManager } from './downloader'
+import { aria2Client } from './aria2-client'
 
 let mainWindow: BrowserWindow | null = null
 let splashWindow: BrowserWindow | null = null
@@ -12,6 +14,84 @@ let splashWindow: BrowserWindow | null = null
 const CLIENT_VERSION = '1.0.6'
 // 版本检查API地址
 const VERSION_API_URL = 'https://download.linglong521.cn/version.php'
+
+// 下载线路配置
+interface DownloadRoute {
+  name: string
+  ip: string
+  latency?: number
+}
+
+const DOWNLOAD_ROUTES: DownloadRoute[] = [
+  { name: '北京', ip: '36.110.192.108' },
+  { name: '陕西', ip: '117.34.84.8' }
+]
+
+// 当前选择的线路
+let currentRoute: DownloadRoute | null = null
+
+// 测试单个 IP 的延迟（TCP 连接测试）
+function testLatency(ip: string, port: number = 443, timeout: number = 5000): Promise<number> {
+  return new Promise((resolve) => {
+    const start = Date.now()
+    const socket = new net.Socket()
+
+    socket.setTimeout(timeout)
+
+    socket.on('connect', () => {
+      const latency = Date.now() - start
+      socket.destroy()
+      resolve(latency)
+    })
+
+    socket.on('timeout', () => {
+      socket.destroy()
+      resolve(-1) // 超时返回 -1
+    })
+
+    socket.on('error', () => {
+      socket.destroy()
+      resolve(-1) // 错误返回 -1
+    })
+
+    socket.connect(port, ip)
+  })
+}
+
+// 测试所有线路并选择最优
+async function testAllRoutes(): Promise<DownloadRoute[]> {
+  const results: DownloadRoute[] = []
+
+  for (const route of DOWNLOAD_ROUTES) {
+    const latency = await testLatency(route.ip)
+    results.push({ ...route, latency })
+  }
+
+  return results
+}
+
+// 选择最优线路
+async function selectBestRoute(): Promise<DownloadRoute> {
+  const results = await testAllRoutes()
+
+  // 过滤掉超时的线路，按延迟排序
+  const validRoutes = results.filter(r => r.latency !== undefined && r.latency >= 0)
+    .sort((a, b) => (a.latency || 0) - (b.latency || 0))
+
+  if (validRoutes.length > 0) {
+    currentRoute = validRoutes[0]
+  } else {
+    // 如果全部超时，默认选第一个
+    currentRoute = { ...DOWNLOAD_ROUTES[0], latency: -1 }
+  }
+
+  return currentRoute
+}
+
+// 获取当前线路
+function getCurrentRoute(): DownloadRoute | null {
+  return currentRoute
+}
 
 // 获取应用程序目录（打包后是exe所在目录，开发时是项目目录）
 function getAppDirectory(): string {
@@ -367,6 +447,32 @@ ipcMain.handle('download:cancel', async (_, taskId: string) => {
     console.error('取消下载失败:', error)
     return { success: false, error: error.message }
   }
+})
+
+// IPC处理 - 下载线路
+ipcMain.handle('route:selectBest', async () => {
+  try {
+    const route = await selectBestRoute()
+    // 设置 aria2 使用选择的 IP
+    aria2Client.setHostMapping('allall02.baidupcs.com', route.ip)
+    return { success: true, route }
+  } catch (error: any) {
+    console.error('选择线路失败:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('route:getCurrent', () => {
+  return getCurrentRoute()
+})
+
+ipcMain.handle('route:testCurrent', async () => {
+  if (!currentRoute) {
+    return { success: false, error: '未选择线路' }
+  }
+  const latency = await testLatency(currentRoute.ip)
+  currentRoute.latency = latency
+  return { success: true, route: currentRoute }
 })
 
 // IPC处理 - 启动画面

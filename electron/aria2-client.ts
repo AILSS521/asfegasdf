@@ -294,8 +294,17 @@ export class Aria2Client extends EventEmitter {
   }
 
   // 自定义域名到 IP 的映射
-  private readonly hostMapping: Record<string, string> = {
-    'allall02.baidupcs.com': '117.34.84.8'
+  private hostMapping: Record<string, string> = {}
+
+  // 设置域名到 IP 的映射
+  setHostMapping(hostname: string, ip: string): void {
+    this.hostMapping[hostname] = ip
+    console.log(`[aria2] 设置域名映射: ${hostname} -> ${ip}`)
+  }
+
+  // 获取当前映射的 IP
+  getHostMapping(hostname: string): string | undefined {
+    return this.hostMapping[hostname]
   }
 
   // 处理 URL，将域名替换为 IP 并返回原始 Host

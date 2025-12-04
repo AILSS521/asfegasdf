@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setConfig: (key: string, value: any) => ipcRenderer.invoke('config:set', key, value),
   getAllConfig: () => ipcRenderer.invoke('config:getAll'),
 
+  // 下载线路
+  selectBestRoute: () => ipcRenderer.invoke('route:selectBest'),
+  getCurrentRoute: () => ipcRenderer.invoke('route:getCurrent'),
+  testCurrentRoute: () => ipcRenderer.invoke('route:testCurrent'),
+
   // 下载管理
   startDownload: (taskId: string, options: {
     url: string

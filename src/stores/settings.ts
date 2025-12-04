@@ -1,12 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+// 下载线路类型
+export interface DownloadRoute {
+  name: string
+  ip: string
+  latency?: number
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   // 下载路径
   const downloadPath = ref('')
 
   // 最大同时下载任务数（1-3）
   const maxConcurrentDownloads = ref(3)
+
+  // 当前下载线路
+  const currentRoute = ref<DownloadRoute | null>(null)
+
+  // 是否正在测试线路
+  const isTestingRoute = ref(false)
 
   // 初始化 - 从主进程读取配置
   async function init() {
@@ -19,6 +32,12 @@ export const useSettingsStore = defineStore('settings', () => {
     const savedMaxConcurrent = await window.electronAPI?.getConfig('maxConcurrentDownloads')
     if (savedMaxConcurrent !== undefined && savedMaxConcurrent >= 1 && savedMaxConcurrent <= 3) {
       maxConcurrentDownloads.value = savedMaxConcurrent
+    }
+
+    // 获取当前线路
+    const route = await window.electronAPI?.getCurrentRoute()
+    if (route) {
+      currentRoute.value = route
     }
   }
 
@@ -46,12 +65,29 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.electronAPI?.setConfig('maxConcurrentDownloads', clampedValue)
   }
 
+  // 测试当前线路延迟
+  async function testCurrentRoute() {
+    if (isTestingRoute.value) return
+    isTestingRoute.value = true
+    try {
+      const result = await window.electronAPI?.testCurrentRoute()
+      if (result?.success && result.route) {
+        currentRoute.value = result.route
+      }
+    } finally {
+      isTestingRoute.value = false
+    }
+  }
+
   return {
     downloadPath,
     maxConcurrentDownloads,
+    currentRoute,
+    isTestingRoute,
     init,
     setDownloadPath,
     selectDownloadPath,
-    setMaxConcurrentDownloads
+    setMaxConcurrentDownloads,
+    testCurrentRoute
   }
 })

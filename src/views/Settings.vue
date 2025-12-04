@@ -39,6 +39,36 @@
           </div>
         </div>
       </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">当前下载线路</span>
+          <span class="label-desc">自动选择延迟最低的下载服务器</span>
+        </div>
+        <div class="setting-control">
+          <div class="route-info" v-if="currentRoute">
+            <span class="route-name">{{ currentRoute.name }}</span>
+            <span
+              class="route-latency"
+              :class="{ testing: isTestingRoute }"
+              @click="testRoute"
+              :title="isTestingRoute ? '测试中...' : '点击重新测试'"
+            >
+              <template v-if="isTestingRoute">
+                <span class="loading-spinner"></span>
+                测试中...
+              </template>
+              <template v-else>
+                {{ currentRoute.latency }}ms
+              </template>
+            </span>
+          </div>
+          <div class="route-info route-loading" v-else>
+            <span class="loading-spinner"></span>
+            <span>正在选择最优线路...</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -66,6 +96,8 @@ const settingsStore = useSettingsStore()
 
 const downloadPath = computed(() => settingsStore.downloadPath)
 const maxConcurrentDownloads = computed(() => settingsStore.maxConcurrentDownloads)
+const currentRoute = computed(() => settingsStore.currentRoute)
+const isTestingRoute = computed(() => settingsStore.isTestingRoute)
 
 function selectDownloadPath() {
   settingsStore.selectDownloadPath()
@@ -73,6 +105,10 @@ function selectDownloadPath() {
 
 function setMaxConcurrentDownloads(value: number) {
   settingsStore.setMaxConcurrentDownloads(value)
+}
+
+function testRoute() {
+  settingsStore.testCurrentRoute()
 }
 
 onMounted(() => {
@@ -195,6 +231,62 @@ onMounted(() => {
       border-color: $primary-color;
       color: #fff;
     }
+  }
+}
+
+.route-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: $bg-tertiary;
+  border: 1px solid $border-color;
+  border-radius: 6px;
+  font-size: 14px;
+
+  &.route-loading {
+    color: $text-secondary;
+  }
+}
+
+.route-name {
+  color: $text-primary;
+  font-weight: 500;
+}
+
+.route-latency {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #10b981;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+
+  &:hover:not(.testing) {
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  &.testing {
+    color: $text-secondary;
+    cursor: default;
+  }
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid $border-color;
+  border-top-color: $primary-color;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

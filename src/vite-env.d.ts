@@ -19,6 +19,13 @@ interface DownloadProgress {
   error?: string
 }
 
+// 下载线路类型
+interface DownloadRoute {
+  name: string
+  ip: string
+  latency?: number
+}
+
 interface ElectronAPI {
   // 窗口控制
   minimize: () => Promise<void>
@@ -39,6 +46,11 @@ interface ElectronAPI {
   // 配置读写
   getConfig: (key: string) => Promise<any>
   setConfig: (key: string, value: any) => Promise<boolean>
+
+  // 下载线路
+  selectBestRoute: () => Promise<DownloadRoute>
+  getCurrentRoute: () => Promise<DownloadRoute | null>
+  testCurrentRoute: () => Promise<{ success: boolean; route?: DownloadRoute; error?: string }>
 
   // 下载管理
   startDownload: (taskId: string, options: {
