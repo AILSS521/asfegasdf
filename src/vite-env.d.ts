@@ -36,6 +36,10 @@ interface ElectronAPI {
   getDownloadPath: () => Promise<string>
   setDownloadPath: (path: string) => Promise<string>
 
+  // 配置读写
+  getConfig: (key: string) => Promise<any>
+  setConfig: (key: string, value: any) => Promise<boolean>
+
   // 下载管理
   startDownload: (taskId: string, options: {
     url: string
