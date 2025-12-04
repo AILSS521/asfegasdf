@@ -5,7 +5,6 @@ import { useApi } from './useApi'
 import type { DownloadProgress, DownloadTask, SubFileTask } from '@/types'
 import path from 'path-browserify'
 
-const MAX_CONCURRENT_DOWNLOADS = 3  // 总并发数（单文件 + 文件夹子文件）
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
 
@@ -191,7 +190,7 @@ export function useDownloadManager() {
     if (!nextTask) return
 
     // 检查下载并行数限制（统一计算单文件 + 文件夹子文件）
-    if (getTotalActiveDownloads() >= MAX_CONCURRENT_DOWNLOADS) {
+    if (getTotalActiveDownloads() >= settingsStore.maxConcurrentDownloads) {
       return
     }
 
@@ -349,7 +348,7 @@ export function useDownloadManager() {
     if (!currentTask || currentTask.status === 'paused' || currentTask.status === 'error') return
 
     // 检查全局并发数限制
-    if (getTotalActiveDownloads() >= MAX_CONCURRENT_DOWNLOADS) return
+    if (getTotalActiveDownloads() >= settingsStore.maxConcurrentDownloads) return
 
     // 检查该文件夹是否已有活跃下载（每个文件夹最多1个）
     if (getFolderActiveCount(task.id) >= 1) return

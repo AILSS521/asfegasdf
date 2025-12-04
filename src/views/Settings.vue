@@ -20,6 +20,25 @@
           </div>
         </div>
       </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">同时下载任务数</span>
+          <span class="label-desc">最多同时下载的文件数量（1-3）</span>
+        </div>
+        <div class="setting-control">
+          <div class="number-select">
+            <button
+              v-for="n in 3"
+              :key="n"
+              :class="['num-btn', { active: maxConcurrentDownloads === n }]"
+              @click="setMaxConcurrentDownloads(n)"
+            >
+              {{ n }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -46,9 +65,14 @@ import { useSettingsStore } from '@/stores/settings'
 const settingsStore = useSettingsStore()
 
 const downloadPath = computed(() => settingsStore.downloadPath)
+const maxConcurrentDownloads = computed(() => settingsStore.maxConcurrentDownloads)
 
 function selectDownloadPath() {
   settingsStore.selectDownloadPath()
+}
+
+function setMaxConcurrentDownloads(value: number) {
+  settingsStore.setMaxConcurrentDownloads(value)
 }
 
 onMounted(() => {
@@ -142,6 +166,34 @@ onMounted(() => {
 
     &:hover {
       background: $bg-hover;
+    }
+  }
+}
+
+.number-select {
+  display: flex;
+  gap: 8px;
+
+  .num-btn {
+    width: 40px;
+    height: 36px;
+    border: 1px solid $border-color;
+    border-radius: 6px;
+    background: $bg-tertiary;
+    color: $text-primary;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      background: $bg-hover;
+    }
+
+    &.active {
+      background: $primary-color;
+      border-color: $primary-color;
+      color: #fff;
     }
   }
 }
