@@ -156,10 +156,9 @@
     function addLog(text, type = 'normal') {
       const line = document.createElement('div');
       line.className = `log-line ${type}`;
-      line.style.animationDelay = `${logArea.children.length * 0.1}s`;
       line.textContent = text;
       logArea.appendChild(line);
-      logArea.scrollTop = logArea.scrollHeight;
+      line.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 
     // 开始倒计时
