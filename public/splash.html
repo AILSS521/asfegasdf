@@ -217,17 +217,17 @@
         addLog('版本检查通过', 'success');
         await new Promise(r => setTimeout(r, 200));
 
-        // 初始化下载器
-        addLog('启动下载器中...');
+        // 初始化下载器（包含获取服务器列表和线路测试）
+        addLog('获取下载服务器...');
         const initResult = await window.electronSplashAPI?.initDownloader();
 
         if (!initResult.success) {
-          addLog('下载器启动失败: ' + (initResult.error || '未知错误'), 'error');
+          addLog(initResult.error || '初始化失败', 'error');
           startCountdown(10, fadeOutAndClose);
           return;
         }
 
-        addLog('下载器已启动', 'success');
+        addLog('下载器已就绪', 'success');
 
         // 显示选择的线路
         if (initResult.route) {

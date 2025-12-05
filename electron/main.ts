@@ -14,6 +14,8 @@ let splashWindow: BrowserWindow | null = null
 const CLIENT_VERSION = '1.0.8'
 // 版本检查API地址
 const VERSION_API_URL = 'https://download.linglong521.cn/version.php'
+// 下载线路API地址
+const ROUTES_API_URL = 'https://download.linglong521.cn/getRoutes.php'
 
 // 下载线路配置
 interface DownloadRoute {
@@ -22,10 +24,20 @@ interface DownloadRoute {
   latency?: number
 }
 
-const DOWNLOAD_ROUTES: DownloadRoute[] = [
-  { name: '北京', ip: '36.110.192.108' },
-  { name: '陕西', ip: '117.34.84.8' }
-]
+// 线路API响应
+interface RoutesApiResponse {
+  code: number
+  message: string
+  data?: {
+    routes: DownloadRoute[]
+    host: string
+  }
+}
+
+// 从远程获取的线路列表
+let downloadRoutes: DownloadRoute[] = []
+// 需要映射的主机名
+let routeHost: string = 'allall02.baidupcs.com'
 
 // 当前选择的线路
 let currentRoute: DownloadRoute | null = null
@@ -58,11 +70,47 @@ function testLatency(ip: string, port: number = 443, timeout: number = 5000): Pr
   })
 }
 
+// 从远程API获取下载线路列表
+function fetchRoutes(): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const request = https.get(ROUTES_API_URL, { timeout: 10000 }, (res) => {
+      let data = ''
+      res.on('data', (chunk) => {
+        data += chunk
+      })
+      res.on('end', () => {
+        try {
+          const json: RoutesApiResponse = JSON.parse(data)
+          if (json.code === 200 && json.data?.routes && json.data.routes.length > 0) {
+            downloadRoutes = json.data.routes
+            routeHost = json.data.host || 'allall02.baidupcs.com'
+            console.log(`[routes] 获取到 ${downloadRoutes.length} 个下载线路`)
+            resolve({ success: true })
+          } else {
+            resolve({ success: false, error: json.message || '线路列表为空' })
+          }
+        } catch (e) {
+          resolve({ success: false, error: '解析线路信息失败' })
+        }
+      })
+    })
+
+    request.on('error', (err) => {
+      resolve({ success: false, error: `网络请求失败: ${err.message}` })
+    })
+
+    request.on('timeout', () => {
+      request.destroy()
+      resolve({ success: false, error: '请求超时' })
+    })
+  })
+}
+
 // 测试所有线路并选择最优
 async function testAllRoutes(): Promise<DownloadRoute[]> {
   const results: DownloadRoute[] = []
 
-  for (const route of DOWNLOAD_ROUTES) {
+  for (const route of downloadRoutes) {
     const latency = await testLatency(route.ip)
     results.push({ ...route, latency })
   }
@@ -71,7 +119,12 @@ async function testAllRoutes(): Promise<DownloadRoute[]> {
 }
 
 // 选择最优线路
-async function selectBestRoute(): Promise<DownloadRoute> {
+// 返回 null 表示所有线路都不可用
+async function selectBestRoute(): Promise<DownloadRoute | null> {
+  if (downloadRoutes.length === 0) {
+    return null
+  }
+
   const results = await testAllRoutes()
 
   // 过滤掉超时的线路，按延迟排序
@@ -80,12 +133,11 @@ async function selectBestRoute(): Promise<DownloadRoute> {
 
   if (validRoutes.length > 0) {
     currentRoute = validRoutes[0]
-  } else {
-    // 如果全部超时，默认选第一个
-    currentRoute = { ...DOWNLOAD_ROUTES[0], latency: -1 }
+    return currentRoute
   }
 
-  return currentRoute
+  // 全部超时，返回 null
+  return null
 }
 
 // 获取当前线路
@@ -454,8 +506,11 @@ ipcMain.handle('download:cancel', async (_, taskId: string) => {
 ipcMain.handle('route:selectBest', async () => {
   try {
     const route = await selectBestRoute()
+    if (!route) {
+      return { success: false, error: '所有下载服务器连接超时' }
+    }
     // 设置 aria2 使用选择的 IP
-    aria2Client.setHostMapping('allall02.baidupcs.com', route.ip)
+    aria2Client.setHostMapping(routeHost, route.ip)
     return { success: true, route }
   } catch (error: any) {
     console.error('选择线路失败:', error)
@@ -483,15 +538,30 @@ ipcMain.handle('splash:checkVersion', async () => {
 
 ipcMain.handle('splash:initDownloader', async () => {
   try {
+    // 1. 从远程获取下载线路
+    console.log('[routes] 获取下载线路...')
+    const routesResult = await fetchRoutes()
+    if (!routesResult.success) {
+      console.error('[routes] 获取线路失败:', routesResult.error)
+      return { success: false, error: `无法获取下载服务器: ${routesResult.error}` }
+    }
+
+    // 2. 初始化下载器
     await downloadManager.init()
 
-    // 选择最优下载线路
+    // 3. 选择最优下载线路
     console.log('[route] 开始测试下载线路...')
     const route = await selectBestRoute()
-    if (route) {
-      aria2Client.setHostMapping('allall02.baidupcs.com', route.ip)
-      console.log(`[route] 已选择线路: ${route.name} (${route.ip}) 延迟: ${route.latency}ms`)
+
+    // 4. 检查是否所有线路都不可用
+    if (!route) {
+      console.error('[route] 所有下载线路均不可用')
+      return { success: false, error: '所有下载服务器连接超时' }
     }
+
+    // 5. 设置主机映射
+    aria2Client.setHostMapping(routeHost, route.ip)
+    console.log(`[route] 已选择线路: ${route.name} (${route.ip}) 延迟: ${route.latency}ms`)
 
     return { success: true, route }
   } catch (error: any) {
