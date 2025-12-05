@@ -51,10 +51,10 @@
           />
         </div>
         <div class="task-icon">
-          <FileIcon :filename="task.file.server_filename" :is-folder="task.isFolder" />
+          <FileIcon :filename="task.file.name" :is-folder="task.isFolder" />
         </div>
         <div class="task-info">
-          <div class="task-name" :title="task.file.server_filename">{{ task.file.server_filename }}</div>
+          <div class="task-name" :title="task.file.name">{{ task.file.name }}</div>
           <div class="task-status error">
             {{ getErrorMessage(task) }}
           </div>
@@ -121,7 +121,7 @@
                 </svg>
               </div>
               <div class="failed-file-info">
-                <div class="failed-file-name" :title="subFile.file.server_filename">{{ subFile.file.server_filename }}</div>
+                <div class="failed-file-name" :title="subFile.file.name">{{ subFile.file.name }}</div>
                 <div class="failed-file-error">{{ subFile.error || '下载失败' }}</div>
               </div>
               <div class="failed-file-size">{{ formatSize(subFile.file.size) }}</div>

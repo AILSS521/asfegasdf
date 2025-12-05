@@ -8,17 +8,13 @@ export const useDownloadStore = defineStore('download', () => {
   const completedTasks = ref<DownloadTask[]>([])
   const failedTasks = ref<DownloadTask[]>([])
 
-  // 当前会话数据
+  // 当前会话数据（通用格式，加密的 session）
   const currentCode = ref('')
   const currentFileList = ref<FileItem[]>([])
   const currentPath = ref('/') // 当前浏览的完整网盘路径
   const basePath = ref('/') // 分享链接的基础路径（虚拟根目录）
   const sessionData = ref<{
-    uk: string
-    shareid: string
-    randsk: string
-    surl: string
-    pwd: string
+    session: string  // 加密的会话数据，客户端透传
   } | null>(null)
 
   // 计算属性
@@ -54,40 +50,36 @@ export const useDownloadStore = defineStore('download', () => {
     currentPath.value = path
   }
 
-  // 获取队列中所有文件的 fs_id（包括文件夹中的子文件）
-  function getQueuedFsIds(): Set<string | number> {
-    const fsIds = new Set<string | number>()
+  // 获取队列中所有文件的 id（包括文件夹中的子文件）
+  function getQueuedFileIds(): Set<string> {
+    const fileIds = new Set<string>()
     downloadTasks.value.forEach(task => {
-      // 添加任务本身的 fs_id
-      fsIds.add(task.file.fs_id)
-      // 如果是文件夹，添加所有子文件的 fs_id
+      // 添加任务本身的 id
+      fileIds.add(task.file.id)
+      // 如果是文件夹，添加所有子文件的 id
       if (task.isFolder && task.subFiles) {
-        task.subFiles.forEach(sf => fsIds.add(sf.file.fs_id))
+        task.subFiles.forEach(sf => fileIds.add(sf.file.id))
       }
     })
-    return fsIds
+    return fileIds
   }
 
   // 添加单个文件任务到下载列表
   function addToDownload(files: FileItem[], downloadBasePath: string | null = null) {
     // 过滤掉已在队列中的文件
-    const queuedFsIds = getQueuedFsIds()
-    const newFiles = files.filter(f => !queuedFsIds.has(f.fs_id))
+    const queuedFileIds = getQueuedFileIds()
+    const newFiles = files.filter(f => !queuedFileIds.has(f.id))
     if (newFiles.length === 0) return
 
     // 保存当前会话数据到任务中，避免被新下载编码覆盖
     const taskSession: TaskSessionData | undefined = sessionData.value ? {
       code: currentCode.value,
-      uk: sessionData.value.uk,
-      shareid: sessionData.value.shareid,
-      randsk: sessionData.value.randsk,
-      surl: sessionData.value.surl,
-      pwd: sessionData.value.pwd,
+      session: sessionData.value.session, // 加密的会话数据，客户端透传
       basePath: basePath.value // 保存分享根目录路径
     } : undefined
 
     const newTasks: DownloadTask[] = newFiles.map(file => ({
-      id: `${Date.now()}-${file.fs_id}`,
+      id: `${Date.now()}-${file.id}`,
       file,
       status: 'waiting' as TaskStatus,
       progress: 0,
@@ -106,17 +98,13 @@ export const useDownloadStore = defineStore('download', () => {
   // 添加文件夹任务到下载列表
   function addFolderToDownload(folder: FileItem, files: FileItem[], downloadBasePath: string) {
     // 检查文件夹是否已在队列中
-    const queuedFsIds = getQueuedFsIds()
-    if (queuedFsIds.has(folder.fs_id)) return
+    const queuedFileIds = getQueuedFileIds()
+    if (queuedFileIds.has(folder.id)) return
 
     // 保存当前会话数据到任务中，避免被新下载编码覆盖
     const taskSession: TaskSessionData | undefined = sessionData.value ? {
       code: currentCode.value,
-      uk: sessionData.value.uk,
-      shareid: sessionData.value.shareid,
-      randsk: sessionData.value.randsk,
-      surl: sessionData.value.surl,
-      pwd: sessionData.value.pwd,
+      session: sessionData.value.session, // 加密的会话数据，客户端透传
       basePath: basePath.value // 保存分享根目录路径
     } : undefined
 
@@ -135,7 +123,7 @@ export const useDownloadStore = defineStore('download', () => {
     }))
 
     const folderTask: DownloadTask = {
-      id: `${Date.now()}-folder-${folder.fs_id}`,
+      id: `${Date.now()}-folder-${folder.id}`,
       file: folder,
       status: 'waiting' as TaskStatus,
       progress: 0,
@@ -252,7 +240,7 @@ export const useDownloadStore = defineStore('download', () => {
 
       // 如果有子文件失败，立即停止整个文件夹下载
       if (!success) {
-        task.error = `文件 "${subFile.file.server_filename}" 下载失败: ${error || '未知错误'}`
+        task.error = `文件 "${subFile.file.name}" 下载失败: ${error || '未知错误'}`
         moveToCompleted(task, false)
         return true // 文件夹任务已结束
       }
@@ -412,7 +400,7 @@ export const useDownloadStore = defineStore('download', () => {
     task.downloadedSize = 0
     task.completedAt = undefined
     task.downloadUrl = undefined
-    task.ua = undefined
+    task.headers = undefined
 
     // 如果是文件夹，重置所有子文件状态
     if (task.isFolder && task.subFiles) {
@@ -424,7 +412,7 @@ export const useDownloadStore = defineStore('download', () => {
         sf.speed = 0
         sf.downloadedSize = 0
         sf.downloadUrl = undefined
-        sf.ua = undefined
+        sf.headers = undefined
       })
       task.completedCount = 0
     }
@@ -459,7 +447,7 @@ export const useDownloadStore = defineStore('download', () => {
           sf.speed = 0
           sf.downloadedSize = 0
           sf.downloadUrl = undefined
-          sf.ua = undefined
+          sf.headers = undefined
         }
       })
 
@@ -474,7 +462,7 @@ export const useDownloadStore = defineStore('download', () => {
       task.downloadedSize = 0
       task.completedAt = undefined
       task.downloadUrl = undefined
-      task.ua = undefined
+      task.headers = undefined
     }
 
     // 添加到下载列表
@@ -520,7 +508,7 @@ export const useDownloadStore = defineStore('download', () => {
             sf.speed = 0
             sf.downloadedSize = 0
             sf.downloadUrl = undefined
-            sf.ua = undefined
+            sf.headers = undefined
           }
         })
 
@@ -535,7 +523,7 @@ export const useDownloadStore = defineStore('download', () => {
         task.downloadedSize = 0
         task.completedAt = undefined
         task.downloadUrl = undefined
-        task.ua = undefined
+        task.headers = undefined
       }
 
       // 添加到下载列表
@@ -561,7 +549,7 @@ export const useDownloadStore = defineStore('download', () => {
     task.downloadedSize = 0
     task.completedAt = undefined
     task.downloadUrl = undefined
-    task.ua = undefined
+    task.headers = undefined
 
     // 如果是文件夹，重置所有子文件状态
     if (task.isFolder && task.subFiles) {
@@ -573,7 +561,7 @@ export const useDownloadStore = defineStore('download', () => {
         sf.speed = 0
         sf.downloadedSize = 0
         sf.downloadUrl = undefined
-        sf.ua = undefined
+        sf.headers = undefined
       })
       task.completedCount = 0
     }
@@ -611,7 +599,7 @@ export const useDownloadStore = defineStore('download', () => {
         sf.speed = 0
         sf.downloadedSize = 0
         sf.downloadUrl = undefined
-        sf.ua = undefined
+        sf.headers = undefined
       }
     })
 

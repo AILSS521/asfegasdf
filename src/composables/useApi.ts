@@ -12,11 +12,12 @@ const api = axios.create({
 })
 
 export function useApi() {
-  // 获取文件列表
-  async function getFileList(code: string, dir: string = '/'): Promise<FileListResponse> {
+  // 获取文件列表（通用接口）
+  async function getFileList(code: string, path: string = '/', session: string = ''): Promise<FileListResponse> {
     const response = await api.post<ApiResponse<FileListResponse>>('/getFileList.php', {
       code,
-      dir
+      path,
+      session
     })
 
     if (response.data.code !== 200) {
@@ -26,16 +27,12 @@ export function useApi() {
     return response.data.data!
   }
 
-  // 获取下载链接
+  // 获取下载链接（通用接口）
   async function getDownloadLink(params: {
     code: string
-    randsk: string
-    uk: string
-    shareid: string
-    fs_id: string | number
-    surl: string
-    dir: string
-    pwd?: string
+    session: string
+    file_id: string
+    path: string
   }): Promise<DownloadLinkResponse> {
     const response = await api.post<ApiResponse<DownloadLinkResponse>>('/getDownloadLink.php', params)
 

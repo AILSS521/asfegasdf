@@ -81,9 +81,9 @@
         </div>
         <div class="col-file">
           <div class="file-icon">
-            <FileIcon :filename="task.file.server_filename" :is-folder="task.file.isdir === 1" />
+            <FileIcon :filename="task.file.name" :is-folder="task.isFolder" />
           </div>
-          <div class="file-name" :title="task.file.server_filename">{{ task.file.server_filename }}</div>
+          <div class="file-name" :title="task.file.name">{{ task.file.name }}</div>
         </div>
         <div class="col-size">
           <!-- 悬停时显示操作按钮 -->

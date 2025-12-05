@@ -37,10 +37,10 @@
           />
         </div>
         <div class="task-icon">
-          <FileIcon :filename="task.file.server_filename" :is-folder="task.file.isdir === 1" />
+          <FileIcon :filename="task.file.name" :is-folder="task.isFolder" />
         </div>
         <div class="task-info">
-          <div class="task-name" :title="task.file.server_filename">{{ task.file.server_filename }}</div>
+          <div class="task-name" :title="task.file.name">{{ task.file.name }}</div>
           <div class="task-status" :class="task.status">
             <template v-if="task.status === 'completed'">
               {{ formatTime(task.completedAt) }}
@@ -148,7 +148,7 @@
                 </svg>
               </div>
               <div class="failed-file-info">
-                <div class="failed-file-name">{{ file.file.server_filename }}</div>
+                <div class="failed-file-name">{{ file.file.name }}</div>
                 <div class="failed-file-error">{{ file.error || '下载失败' }}</div>
               </div>
               <div class="failed-file-size">{{ formatSize(file.file.size) }}</div>
@@ -295,7 +295,7 @@ function getTaskPath(task: DownloadTask): string | null {
       // 获取子文件的目录路径
       const subFileDir = path.dirname(subFileWithPath.localPath)
       // 根据 downloadBasePath 计算文件夹的实际路径
-      // 文件夹名称就是 task.file.server_filename
+      // 文件夹名称就是 task.file.name
       // 需要找到这个文件夹在本地的位置
 
       // 子文件的相对路径（相对于 downloadBasePath）

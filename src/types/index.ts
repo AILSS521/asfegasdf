@@ -1,13 +1,11 @@
-// 文件项
+// 通用文件项（抽象格式，不暴露具体网盘实现）
 export interface FileItem {
-  fs_id: number | string
-  server_filename: string
-  path: string
-  size: number
-  isdir: number
-  server_mtime: number
-  category?: number
-  md5?: string
+  id: string              // 文件唯一标识
+  name: string            // 文件名
+  path: string            // 文件路径
+  size: number            // 文件大小
+  type: 'file' | 'folder' // 文件类型
+  modified: number        // 修改时间戳
 }
 
 // 任务状态
@@ -31,20 +29,16 @@ export interface SubFileTask {
   retryCount: number
   error?: string
   downloadUrl?: string
-  ua?: string
+  headers?: Record<string, string>
   localPath?: string
 }
 
-// 任务会话数据（用于获取下载链接）
+// 任务会话数据（加密的会话字符串，客户端不知道内容）
 export interface TaskSessionData {
-  code: string
-  uk: string
-  shareid: string
-  randsk: string
-  surl: string
-  pwd: string
-  basePath: string // 分享链接的根目录路径，用于计算相对路径
-  currentApiDir?: string // 添加任务时的API目录路径，用于获取下载链接
+  code: string            // 下载编码
+  session: string         // 加密的会话数据（服务端加密，客户端透传）
+  basePath: string        // 分享链接的根目录路径，用于计算相对路径
+  currentApiPath?: string // 添加任务时的API目录路径，用于获取下载链接
 }
 
 // 下载任务
@@ -62,7 +56,7 @@ export interface DownloadTask {
   gid?: string // aria2 task id
   error?: string
   downloadUrl?: string
-  ua?: string
+  headers?: Record<string, string>
   localPath?: string
   downloadBasePath?: string | null // 下载基础路径，null 表示直接放在下载目录，不创建子目录
   sessionData?: TaskSessionData // 任务专属的会话数据，避免被新下载编码覆盖
@@ -83,24 +77,19 @@ export interface ApiResponse<T = any> {
   data?: T
 }
 
-// 文件列表响应
+// 文件列表响应（通用格式）
 export interface FileListResponse {
-  uk: string
-  shareid: string
-  randsk: string
-  surl: string
-  pwd: string
-  list: FileItem[]
-  ttl: number
+  session: string         // 加密的会话数据
+  ttl: number             // 剩余有效期（秒）
+  path: string            // 当前路径
+  files: FileItem[]       // 文件列表
 }
 
-// 下载链接响应
+// 下载链接响应（通用格式）
 export interface DownloadLinkResponse {
-  filename: string
-  fs_id: string | number
-  url: string
-  urls: string[]
-  ua: string
+  name: string                      // 文件名
+  url: string                       // 下载链接
+  headers: Record<string, string>   // 下载时需要的请求头
 }
 
 // 下载进度
@@ -113,4 +102,3 @@ export interface DownloadProgress {
   status: 'creating' | 'downloading' | 'paused' | 'completed' | 'error'
   error?: string
 }
-

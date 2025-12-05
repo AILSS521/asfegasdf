@@ -12,9 +12,9 @@ const RETRY_DELAY = 5000
 // 规则：
 // - 如果文件在分享根目录下（fileDir === basePath），返回 "/"
 // - 如果文件在子目录下，返回完整的目录路径
-function getApiDir(filePath: string, basePath: string): string {
+function getApiPath(filePath: string, basePath: string): string {
   const fileDir = path.dirname(filePath)
-  // 文件在分享根目录下，dir 应该是 "/"
+  // 文件在分享根目录下，path 应该是 "/"
   if (fileDir === basePath) {
     return '/'
   }
@@ -247,17 +247,12 @@ export function useDownloadManager() {
     }
 
     try {
-      // 获取下载链接
-      // dir 参数：分享根目录下的文件用 "/"，子目录下的文件用完整路径
+      // 获取下载链接（通用接口）
       const linkData = await api.getDownloadLink({
         code: session.code,
-        randsk: session.randsk,
-        uk: session.uk,
-        shareid: session.shareid,
-        fs_id: task.file.fs_id,
-        surl: session.surl,
-        dir: getApiDir(task.file.path, session.basePath),
-        pwd: session.pwd
+        session: session.session,
+        file_id: task.file.id,
+        path: getApiPath(task.file.path, session.basePath)
       })
 
       // 获取链接后检查任务是否被暂停或已不存在
@@ -270,7 +265,7 @@ export function useDownloadManager() {
       }
 
       task.downloadUrl = linkData.url
-      task.ua = linkData.ua
+      task.headers = linkData.headers
 
       // 更新状态为创建文件中
       downloadStore.updateTaskStatus(task.id, 'creating')
@@ -292,7 +287,7 @@ export function useDownloadManager() {
           ? path.join(settingsStore.downloadPath, relativePath)
           : settingsStore.downloadPath
       }
-      const localPath = path.join(localDir, task.file.server_filename)
+      const localPath = path.join(localDir, task.file.name)
       task.localPath = localPath
 
       // 开始下载前再次检查任务状态
@@ -308,8 +303,8 @@ export function useDownloadManager() {
       const result = await window.electronAPI?.startDownload(task.id, {
         url: linkData.url,
         savePath: localDir,
-        filename: task.file.server_filename,
-        userAgent: linkData.ua
+        filename: task.file.name,
+        userAgent: linkData.headers['User-Agent']
       })
 
       if (result?.success) {
@@ -394,7 +389,7 @@ export function useDownloadManager() {
     if (currentTask.status === 'paused' || currentTask.status === 'error') return
 
     // 更新当前正在下载的文件名（显示最新启动的）
-    task.currentFileName = subFile.file.server_filename
+    task.currentFileName = subFile.file.name
     task.currentFileIndex = index
 
     // 生成子文件的下载 ID
@@ -432,21 +427,16 @@ export function useDownloadManager() {
         return
       }
 
-      // 获取下载链接
-      // dir 参数：分享根目录下的文件用 "/"，子目录下的文件用完整路径
+      // 获取下载链接（通用接口）
       const linkData = await api.getDownloadLink({
         code: session.code,
-        randsk: session.randsk,
-        uk: session.uk,
-        shareid: session.shareid,
-        fs_id: subFile.file.fs_id,
-        surl: session.surl,
-        dir: getApiDir(subFile.file.path, session.basePath),
-        pwd: session.pwd
+        session: session.session,
+        file_id: subFile.file.id,
+        path: getApiPath(subFile.file.path, session.basePath)
       })
 
       subFile.downloadUrl = linkData.url
-      subFile.ua = linkData.ua
+      subFile.headers = linkData.headers
 
       // 获取链接后再次检查任务状态
       const taskAfterApi = downloadStore.downloadTasks.find(t => t.id === task.id)
@@ -474,7 +464,7 @@ export function useDownloadManager() {
       const localDir = relativePath
         ? path.join(settingsStore.downloadPath, relativePath)
         : settingsStore.downloadPath
-      const localPath = path.join(localDir, subFile.file.server_filename)
+      const localPath = path.join(localDir, subFile.file.name)
       subFile.localPath = localPath
 
       // 记录文件夹下载映射
@@ -484,8 +474,8 @@ export function useDownloadManager() {
       const result = await window.electronAPI?.startDownload(subFileDownloadId, {
         url: linkData.url,
         savePath: localDir,
-        filename: subFile.file.server_filename,
-        userAgent: linkData.ua
+        filename: subFile.file.name,
+        userAgent: linkData.headers['User-Agent']
       })
 
       if (result?.success) {

@@ -95,33 +95,33 @@
         <div class="table-body">
           <div
             v-for="file in sortedFileList"
-            :key="file.fs_id"
+            :key="file.id"
             class="table-row"
-            :class="{ selected: selectedIds.has(file.fs_id) }"
-            @mouseenter="hoverFileId = file.fs_id"
+            :class="{ selected: selectedIds.has(file.id) }"
+            @mouseenter="hoverFileId = file.id"
             @mouseleave="hoverFileId = null"
           >
-            <div class="col-checkbox" :class="{ visible: selectedIds.has(file.fs_id) }">
+            <div class="col-checkbox" :class="{ visible: selectedIds.has(file.id) }">
               <input
                 type="checkbox"
-                :checked="selectedIds.has(file.fs_id)"
+                :checked="selectedIds.has(file.id)"
                 @change="toggleSelect(file)"
               />
             </div>
             <div class="col-name" :style="{ width: columnWidths.name + '%' }">
               <div class="file-icon">
-                <FileIcon :filename="file.server_filename" :is-folder="file.isdir === 1" />
+                <FileIcon :filename="file.name" :is-folder="file.type === 'folder'" />
               </div>
               <span
                 class="file-name"
-                :class="{ clickable: file.isdir === 1 }"
-                :title="file.server_filename"
-                @click="file.isdir === 1 && navigateTo(file.path)"
+                :class="{ clickable: file.type === 'folder' }"
+                :title="file.name"
+                @click="file.type === 'folder' && navigateTo(file.path)"
               >
-                {{ file.server_filename }}
+                {{ file.name }}
               </span>
               <button
-                v-if="hoverFileId === file.fs_id && file.isdir !== 1"
+                v-if="hoverFileId === file.id && file.type !== 'folder'"
                 class="download-btn-inline"
                 @click.stop="downloadSingle(file)"
                 title="下载"
@@ -131,7 +131,7 @@
                 </svg>
               </button>
               <button
-                v-if="hoverFileId === file.fs_id && file.isdir === 1"
+                v-if="hoverFileId === file.id && file.type === 'folder'"
                 class="download-btn-inline"
                 @click.stop="downloadFolder(file)"
                 title="下载文件夹"
@@ -142,13 +142,13 @@
               </button>
             </div>
             <div class="col-size" :style="{ width: columnWidths.size + '%' }">
-              {{ file.isdir === 1 ? '--' : formatSize(file.size) }}
+              {{ file.type === 'folder' ? '--' : formatSize(file.size) }}
             </div>
             <div class="col-type" :style="{ width: columnWidths.type + '%' }">
               {{ getFileType(file) }}
             </div>
             <div class="col-time" :style="{ width: columnWidths.time + '%' }">
-              {{ formatTime(file.server_mtime) }}
+              {{ formatTime(file.modified) }}
             </div>
           </div>
         </div>
@@ -284,13 +284,13 @@ const sortedFileList = computed(() => {
     let comparison = 0
 
     // 文件夹始终排在前面
-    if (a.isdir !== b.isdir) {
-      return b.isdir - a.isdir
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1
     }
 
     switch (sortKey.value) {
       case 'name':
-        comparison = a.server_filename.localeCompare(b.server_filename, 'zh-CN')
+        comparison = a.name.localeCompare(b.name, 'zh-CN')
         break
       case 'size':
         comparison = (a.size || 0) - (b.size || 0)
@@ -299,7 +299,7 @@ const sortedFileList = computed(() => {
         comparison = getFileType(a).localeCompare(getFileType(b), 'zh-CN')
         break
       case 'time':
-        comparison = a.server_mtime - b.server_mtime
+        comparison = a.modified - b.modified
         break
     }
 
@@ -422,9 +422,9 @@ function stopResize() {
 
 // 获取文件类型
 function getFileType(file: FileItem): string {
-  if (file.isdir === 1) return '文件夹'
+  if (file.type === 'folder') return '文件夹'
 
-  const ext = file.server_filename.split('.').pop()?.toLowerCase() || ''
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
 
   const typeMap: Record<string, string> = {
     // 文档
@@ -531,7 +531,7 @@ const breadcrumbs = computed(() => {
 // 是否全选
 const isAllSelected = computed(() => {
   if (fileList.value.length === 0) return false
-  return fileList.value.every(f => selectedIds.value.has(f.fs_id))
+  return fileList.value.every(f => selectedIds.value.has(f.id))
 })
 
 // 获取用于API请求的路径
@@ -555,24 +555,20 @@ async function fetchFileList(isInitial: boolean = false) {
     // 转换为 API 路径
     const apiPath = getApiPath(currentPath.value)
     const data = await api.getFileList(code.value.trim(), apiPath)
-    fileList.value = data.list
+    fileList.value = data.files
 
     // 首次获取时，根据返回的文件路径自动确定基础路径
-    if (isInitial && data.list.length > 0) {
-      const firstFilePath = data.list[0].path
+    if (isInitial && data.files.length > 0) {
+      const firstFilePath = data.files[0].path
       // 获取文件的父目录作为基础路径（用于显示转换）
       const parentDir = firstFilePath.substring(0, firstFilePath.lastIndexOf('/')) || '/'
       basePath.value = parentDir
       currentPath.value = parentDir
     }
 
-    // 保存会话数据到 store
+    // 保存会话数据到 store（通用格式，加密的 session）
     downloadStore.setSessionData({
-      uk: data.uk,
-      shareid: data.shareid,
-      randsk: data.randsk,
-      surl: data.surl,
-      pwd: data.pwd
+      session: data.session
     })
   } catch (error: any) {
     errorMessage.value = error.message || '获取文件列表失败'
@@ -605,10 +601,10 @@ async function navigateTo(path: string) {
 
 // 切换选择
 function toggleSelect(file: FileItem) {
-  if (selectedIds.value.has(file.fs_id)) {
-    selectedIds.value.delete(file.fs_id)
+  if (selectedIds.value.has(file.id)) {
+    selectedIds.value.delete(file.id)
   } else {
-    selectedIds.value.add(file.fs_id)
+    selectedIds.value.add(file.id)
   }
 }
 
@@ -617,7 +613,7 @@ function toggleSelectAll() {
   if (isAllSelected.value) {
     selectedIds.value.clear()
   } else {
-    fileList.value.forEach(f => selectedIds.value.add(f.fs_id))
+    fileList.value.forEach(f => selectedIds.value.add(f.id))
   }
 }
 
@@ -663,8 +659,8 @@ async function getAllFilesInFolder(folderPath: string): Promise<FileItem[]> {
   const data = await api.getFileList(code.value.trim(), folderPath)
   const files: FileItem[] = []
 
-  for (const item of data.list) {
-    if (item.isdir === 1) {
+  for (const item of data.files) {
+    if (item.type === 'folder') {
       // 递归获取子文件夹内的文件
       const subFiles = await getAllFilesInFolder(item.path)
       files.push(...subFiles)
@@ -678,12 +674,12 @@ async function getAllFilesInFolder(folderPath: string): Promise<FileItem[]> {
 
 // 下载选中的文件和文件夹
 async function downloadSelected() {
-  const selectedItems = fileList.value.filter(f => selectedIds.value.has(f.fs_id))
+  const selectedItems = fileList.value.filter(f => selectedIds.value.has(f.id))
   if (selectedItems.length === 0) return
 
   // 分离文件和文件夹
-  const files = selectedItems.filter(f => f.isdir !== 1)
-  const folders = selectedItems.filter(f => f.isdir === 1)
+  const files = selectedItems.filter(f => f.type !== 'folder')
+  const folders = selectedItems.filter(f => f.type === 'folder')
 
   // 先添加普通文件任务
   if (files.length > 0) {
