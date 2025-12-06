@@ -15,7 +15,7 @@ interface DownloadProgress {
   downloadedSize: number
   speed: number
   progress: number
-  status: 'downloading' | 'paused' | 'completed' | 'error'
+  status: 'creating' | 'downloading' | 'paused' | 'completed' | 'error'
   error?: string
 }
 
@@ -24,6 +24,18 @@ interface DownloadRoute {
   name: string
   ip: string
   latency?: number
+}
+
+// 连接状态类型
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+
+// 连接统计信息类型
+interface ConnectionStats {
+  status: ConnectionStatus
+  rpcFailures: number
+  reconnectAttempts: number
+  lastHeartbeat: number
+  taskCount: number
 }
 
 interface ElectronAPI {
@@ -63,9 +75,18 @@ interface ElectronAPI {
   resumeDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
   cancelDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
 
+  // 下载器连接状态
+  getConnectionStatus: () => Promise<ConnectionStatus>
+  getConnectionStats: () => Promise<ConnectionStats>
+  reconnectDownloader: () => Promise<{ success: boolean; error?: string }>
+
   // 下载进度监听
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => void
   removeDownloadProgressListener: () => void
+
+  // 连接状态监听
+  onConnectionStatusChange: (callback: (status: ConnectionStatus, error?: string) => void) => void
+  removeConnectionStatusListener: () => void
 }
 
 interface Window {

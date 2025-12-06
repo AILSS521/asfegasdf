@@ -1,12 +1,17 @@
-import { ref } from 'vue'
+import { ref, readonly } from 'vue'
 import { useDownloadStore } from '@/stores/download'
 import { useSettingsStore } from '@/stores/settings'
 import { useApi } from './useApi'
-import type { DownloadProgress, DownloadTask, SubFileTask } from '@/types'
+import type { DownloadProgress, DownloadTask, SubFileTask, ConnectionStatus } from '@/types'
 import path from 'path-browserify'
 
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
+
+// 全局连接状态
+const connectionStatus = ref<ConnectionStatus>('disconnected')
+const connectionError = ref<string | undefined>(undefined)
+const isReconnecting = ref(false)
 
 // 获取用于API请求的目录路径
 // 规则：
@@ -46,6 +51,31 @@ export function useDownloadManager() {
         downloadStore.updateAllFolderSpeeds()
       }, 1000)
     }
+
+    // 获取初始连接状态
+    window.electronAPI?.getConnectionStatus().then((status: ConnectionStatus) => {
+      connectionStatus.value = status
+      console.log(`[DownloadManager] 初始连接状态: ${status}`)
+    })
+
+    // 监听连接状态变化
+    window.electronAPI?.onConnectionStatusChange((status: ConnectionStatus, error?: string) => {
+      console.log(`[DownloadManager] 连接状态变化: ${status}`, error || '')
+      connectionStatus.value = status
+      connectionError.value = error
+
+      if (status === 'reconnecting') {
+        isReconnecting.value = true
+      } else if (status === 'connected') {
+        isReconnecting.value = false
+        // 重连成功后，重新处理等待队列
+        processQueue()
+      } else if (status === 'error') {
+        isReconnecting.value = false
+        // 连接错误，暂停所有下载
+        console.error('[DownloadManager] 连接错误，暂停所有下载')
+      }
+    })
 
     window.electronAPI?.onDownloadProgress((progress: DownloadProgress) => {
       // 检查是否是文件夹子文件的下载
@@ -143,10 +173,33 @@ export function useDownloadManager() {
   // 移除进度监听
   function removeProgressListener() {
     window.electronAPI?.removeDownloadProgressListener()
+    window.electronAPI?.removeConnectionStatusListener()
     // 停止文件夹速度更新定时器
     if (folderSpeedTimer) {
       clearInterval(folderSpeedTimer)
       folderSpeedTimer = null
+    }
+  }
+
+  // 手动触发重连
+  async function reconnect(): Promise<{ success: boolean; error?: string }> {
+    try {
+      isReconnecting.value = true
+      const result = await window.electronAPI?.reconnectDownloader()
+      return result || { success: false, error: '未知错误' }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    } finally {
+      isReconnecting.value = false
+    }
+  }
+
+  // 获取连接状态
+  function getConnectionStatus() {
+    return {
+      status: readonly(connectionStatus),
+      error: readonly(connectionError),
+      isReconnecting: readonly(isReconnecting)
     }
   }
 
@@ -191,6 +244,12 @@ export function useDownloadManager() {
 
   // 处理等待队列
   async function processQueue() {
+    // 检查连接状态，如果未连接或正在重连，不处理队列
+    if (connectionStatus.value !== 'connected') {
+      console.log(`[DownloadManager] 连接状态: ${connectionStatus.value}，暂不处理队列`)
+      return
+    }
+
     // 检查错误数量
     if (errorCount.value >= 3) {
       downloadStore.pauseAll()
@@ -546,6 +605,9 @@ export function useDownloadManager() {
     cancelTask,
     setupProgressListener,
     removeProgressListener,
-    fillFolderDownloadSlots
+    fillFolderDownloadSlots,
+    // 连接状态相关
+    reconnect,
+    getConnectionStatus
   }
 }

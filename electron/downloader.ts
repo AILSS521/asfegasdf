@@ -1,4 +1,4 @@
-import { aria2Client, DownloadProgress } from './aria2-client'
+import { aria2Client, DownloadProgress, ConnectionStatus } from './aria2-client'
 
 // 下载选项接口
 interface DownloadOptions {
@@ -10,9 +10,13 @@ interface DownloadOptions {
   userAgent?: string
 }
 
+// 连接状态变化回调类型
+type ConnectionStatusCallback = (status: ConnectionStatus, error?: string) => void
+
 // 下载管理器 - 基于 aria2
 export class DownloadManager {
   private progressCallback: ((progress: DownloadProgress) => void) | null = null
+  private connectionStatusCallback: ConnectionStatusCallback | null = null
   private isInitialized: boolean = false
 
   constructor() {
@@ -22,6 +26,38 @@ export class DownloadManager {
         this.progressCallback(progress)
       }
     })
+
+    // 监听连接状态变化
+    aria2Client.on('connectionStatus', (data: { status: ConnectionStatus; error?: string }) => {
+      if (this.connectionStatusCallback) {
+        this.connectionStatusCallback(data.status, data.error)
+      }
+    })
+
+    // 监听重连成功事件
+    aria2Client.on('reconnected', () => {
+      console.log('[DownloadManager] aria2 重连成功')
+    })
+  }
+
+  // 设置连接状态回调
+  setConnectionStatusCallback(callback: ConnectionStatusCallback): void {
+    this.connectionStatusCallback = callback
+  }
+
+  // 获取当前连接状态
+  getConnectionStatus(): ConnectionStatus {
+    return aria2Client.getConnectionStatus()
+  }
+
+  // 获取连接统计信息
+  getConnectionStats() {
+    return aria2Client.getConnectionStats()
+  }
+
+  // 手动触发重连
+  async reconnect(): Promise<void> {
+    return aria2Client.reconnect()
   }
 
   // 初始化 aria2

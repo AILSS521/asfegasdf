@@ -102,3 +102,15 @@ export interface DownloadProgress {
   status: 'creating' | 'downloading' | 'paused' | 'completed' | 'error'
   error?: string
 }
+
+// aria2 连接状态
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+
+// 连接统计信息
+export interface ConnectionStats {
+  status: ConnectionStatus
+  rpcFailures: number
+  reconnectAttempts: number
+  lastHeartbeat: number
+  taskCount: number
+}

@@ -11,6 +11,18 @@ interface DownloadProgress {
   error?: string
 }
 
+// 连接状态类型
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+
+// 连接统计信息类型
+interface ConnectionStats {
+  status: ConnectionStatus
+  rpcFailures: number
+  reconnectAttempts: number
+  lastHeartbeat: number
+  taskCount: number
+}
+
 // 暴露API到渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
   // 窗口控制
@@ -51,9 +63,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resumeDownload: (taskId: string) => ipcRenderer.invoke('download:resume', taskId),
   cancelDownload: (taskId: string) => ipcRenderer.invoke('download:cancel', taskId),
 
+  // 下载器连接状态
+  getConnectionStatus: () => ipcRenderer.invoke('download:getConnectionStatus') as Promise<ConnectionStatus>,
+  getConnectionStats: () => ipcRenderer.invoke('download:getConnectionStats') as Promise<ConnectionStats>,
+  reconnectDownloader: () => ipcRenderer.invoke('download:reconnect') as Promise<{ success: boolean; error?: string }>,
+
   // 下载进度监听
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => {
     ipcRenderer.on('download:progress', (_, progress) => callback(progress))
+  },
+
+  // 连接状态变化监听
+  onConnectionStatusChange: (callback: (status: ConnectionStatus, error?: string) => void) => {
+    ipcRenderer.on('download:connectionStatus', (_, data: { status: ConnectionStatus; error?: string }) => {
+      callback(data.status, data.error)
+    })
+  },
+
+  // 移除连接状态监听
+  removeConnectionStatusListener: () => {
+    ipcRenderer.removeAllListeners('download:connectionStatus')
   },
 
   // 移除下载进度监听

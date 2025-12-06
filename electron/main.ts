@@ -367,6 +367,11 @@ function createWindow(): void {
   downloadManager.setProgressCallback((progress) => {
     mainWindow?.webContents.send('download:progress', progress)
   })
+
+  // 设置连接状态回调
+  downloadManager.setConnectionStatusCallback((status, error) => {
+    mainWindow?.webContents.send('download:connectionStatus', { status, error })
+  })
 }
 
 // IPC处理 - 窗口控制
@@ -498,6 +503,25 @@ ipcMain.handle('download:cancel', async (_, taskId: string) => {
     return { success: true }
   } catch (error: any) {
     console.error('取消下载失败:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+// IPC处理 - 下载器连接状态
+ipcMain.handle('download:getConnectionStatus', () => {
+  return downloadManager.getConnectionStatus()
+})
+
+ipcMain.handle('download:getConnectionStats', () => {
+  return downloadManager.getConnectionStats()
+})
+
+ipcMain.handle('download:reconnect', async () => {
+  try {
+    await downloadManager.reconnect()
+    return { success: true }
+  } catch (error: any) {
+    console.error('重连失败:', error)
     return { success: false, error: error.message }
   }
 })
