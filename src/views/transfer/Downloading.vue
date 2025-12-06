@@ -602,7 +602,7 @@ onMounted(() => {
   font-size: 13px;
 
   &.waiting { color: $text-secondary; }
-  &.fetching { color: #ff9800; }
+  &.fetching { color: $text-primary; }
   &.processing { color: $primary-color; }
   &.creating { color: $primary-color; }
   &.paused { color: $primary-color; }
@@ -623,8 +623,8 @@ onMounted(() => {
 .fetching-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid #ffcc80;
-  border-top-color: #ff9800;
+  border: 2px solid rgba($primary-color, 0.3);
+  border-top-color: $primary-color;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -637,7 +637,7 @@ onMounted(() => {
 
 .fetching-text {
   font-size: 13px;
-  color: #ff9800;
+  color: $text-primary;
   display: flex;
   flex-direction: column;
   gap: 2px;
