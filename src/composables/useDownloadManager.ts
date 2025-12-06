@@ -426,6 +426,19 @@ export function useDownloadManager() {
     // 检查全局并发数限制
     if (getTotalActiveDownloads() >= settingsStore.maxConcurrentDownloads) return
 
+    // 清理过期的映射（子文件状态不是 downloading/processing/creating 的映射）
+    // 这处理了暂停后恢复时映射未清理的问题
+    const toClean: string[] = []
+    folderDownloadMap.value.forEach((info, downloadId) => {
+      if (info.taskId === task.id) {
+        const subFile = task.subFiles![info.fileIndex]
+        if (subFile && subFile.status !== 'downloading' && subFile.status !== 'processing' && subFile.status !== 'creating') {
+          toClean.push(downloadId)
+        }
+      }
+    })
+    toClean.forEach(id => folderDownloadMap.value.delete(id))
+
     // 检查该文件夹是否已有活跃下载（每个文件夹最多1个）
     if (getFolderActiveCount(task.id) >= 1) return
 
