@@ -604,6 +604,19 @@ export class Aria2Client extends EventEmitter {
     }
   }
 
+  // 清理已完成任务的记录（从 aria2 的已停止任务列表中移除）
+  async removeDownloadResult(gid: string): Promise<void> {
+    try {
+      await this.sendRequest('removeDownloadResult', [gid])
+      console.log(`[aria2] 已清理 aria2 任务记录: ${gid}`)
+    } catch (e: any) {
+      // 如果任务不存在，忽略错误
+      if (!e.message?.includes('is not found')) {
+        console.warn(`[aria2] 清理任务记录失败: ${gid}`, e.message)
+      }
+    }
+  }
+
   // 获取任务状态
   async tellStatus(taskId: string): Promise<Aria2TaskStatus | null> {
     const gid = this.taskMap.get(taskId)
@@ -777,6 +790,8 @@ export class Aria2Client extends EventEmitter {
         // 立即清理映射（不再延迟）
         this.taskMap.delete(taskId)
         this.gidMap.delete(task.gid)
+        // 清理 aria2 中的任务记录
+        this.removeDownloadResult(task.gid)
         // 延迟清理已完成集合（给足够时间确保不会重复处理）
         setTimeout(() => {
           this.completedGids.delete(task.gid)
@@ -795,6 +810,8 @@ export class Aria2Client extends EventEmitter {
         // 清理映射
         this.taskMap.delete(taskId)
         this.gidMap.delete(task.gid)
+        // 清理 aria2 中的任务记录
+        this.removeDownloadResult(task.gid)
         setTimeout(() => {
           this.completedGids.delete(task.gid)
         }, 5000)
