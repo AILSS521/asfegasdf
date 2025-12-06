@@ -505,6 +505,7 @@ export const useDownloadStore = defineStore('download', () => {
         sf.downloadedSize = 0
         sf.downloadUrl = undefined
         sf.headers = undefined
+        sf.localPath = undefined
       })
       task.completedCount = 0
     }
@@ -540,6 +541,7 @@ export const useDownloadStore = defineStore('download', () => {
           sf.downloadedSize = 0
           sf.downloadUrl = undefined
           sf.headers = undefined
+          sf.localPath = undefined
         }
       })
 
@@ -555,6 +557,7 @@ export const useDownloadStore = defineStore('download', () => {
       task.completedAt = undefined
       task.downloadUrl = undefined
       task.headers = undefined
+      task.localPath = undefined
     }
 
     // 添加到下载列表
@@ -601,6 +604,7 @@ export const useDownloadStore = defineStore('download', () => {
             sf.downloadedSize = 0
             sf.downloadUrl = undefined
             sf.headers = undefined
+            sf.localPath = undefined
           }
         })
 
@@ -616,6 +620,7 @@ export const useDownloadStore = defineStore('download', () => {
         task.completedAt = undefined
         task.downloadUrl = undefined
         task.headers = undefined
+        task.localPath = undefined
       }
 
       // 添加到下载列表
@@ -654,6 +659,7 @@ export const useDownloadStore = defineStore('download', () => {
         sf.downloadedSize = 0
         sf.downloadUrl = undefined
         sf.headers = undefined
+        sf.localPath = undefined
       })
       task.completedCount = 0
     }
@@ -692,6 +698,7 @@ export const useDownloadStore = defineStore('download', () => {
         sf.downloadedSize = 0
         sf.downloadUrl = undefined
         sf.headers = undefined
+        sf.localPath = undefined
       }
     })
 

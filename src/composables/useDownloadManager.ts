@@ -616,6 +616,7 @@ export function useDownloadManager() {
     pauseTask,
     resumeTask,
     cancelTask,
+    cancelFolderDownloads,
     setupProgressListener,
     removeProgressListener,
     fillFolderDownloadSlots,

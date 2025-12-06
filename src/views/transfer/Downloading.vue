@@ -317,15 +317,22 @@ function cancelFetching(id: string) {
 async function deleteTask(id: string) {
   const task = tasks.value.find(t => t.id === id)
   if (task) {
+    // 文件夹任务需要先取消所有子文件下载并清理映射
+    if (task.isFolder) {
+      downloadManager.cancelFolderDownloads(id)
+    }
+
     // 如果正在获取文件列表，直接取消
     if (task.status === 'fetching') {
       task.error = '已取消'
       downloadStore.moveToCompleted(task, false)
     }
     // 如果正在下载，先取消
-    else if (task.status === 'downloading' || task.status === 'paused') {
+    else if (task.status === 'downloading' || task.status === 'paused' || task.status === 'processing' || task.status === 'creating') {
       try {
-        await window.electronAPI?.cancelDownload(id)
+        if (!task.isFolder) {
+          await window.electronAPI?.cancelDownload(id)
+        }
       } catch (e) {
         // ignore
       }
