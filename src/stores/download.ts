@@ -144,6 +144,98 @@ export const useDownloadStore = defineStore('download', () => {
     downloadTasks.value.push(folderTask)
   }
 
+  // 创建文件夹占位任务（用于异步获取文件列表）
+  function createFolderPlaceholder(folder: FileItem, downloadBasePath: string): string {
+    // 检查文件夹是否已在队列中
+    const queuedFileIds = getQueuedFileIds()
+    if (queuedFileIds.has(folder.id)) return ''
+
+    // 保存当前会话数据到任务中，避免被新下载编码覆盖
+    const taskSession: TaskSessionData | undefined = sessionData.value ? {
+      code: currentCode.value,
+      session: sessionData.value.session,
+      basePath: basePath.value
+    } : undefined
+
+    const taskId = `${Date.now()}-folder-${folder.id}`
+    const folderTask: DownloadTask = {
+      id: taskId,
+      file: folder,
+      status: 'fetching' as TaskStatus, // 正在获取文件列表
+      progress: 0,
+      speed: 0,
+      downloadedSize: 0,
+      totalSize: 0,
+      createdAt: Date.now(),
+      retryCount: 0,
+      downloadBasePath,
+      isFolder: true,
+      subFiles: [], // 空列表，等待填充
+      completedCount: 0,
+      totalCount: 0,
+      currentFileIndex: 0,
+      fetchedCount: 0,
+      sessionData: taskSession
+    }
+
+    downloadTasks.value.push(folderTask)
+    return taskId
+  }
+
+  // 更新文件夹获取进度
+  function updateFolderFetchProgress(taskId: string, fetchedCount: number) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task && task.isFolder && task.status === 'fetching') {
+      task.fetchedCount = fetchedCount
+    }
+  }
+
+  // 设置文件夹任务的文件列表（获取完成后调用）
+  function setFolderFiles(taskId: string, files: FileItem[]) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task && task.isFolder) {
+      // 计算总大小
+      const totalSize = files.reduce((sum, f) => sum + f.size, 0)
+
+      // 创建子文件任务列表
+      const subFiles: SubFileTask[] = files.map(file => ({
+        file,
+        status: 'waiting' as TaskStatus,
+        progress: 0,
+        speed: 0,
+        downloadedSize: 0,
+        totalSize: file.size,
+        retryCount: 0
+      }))
+
+      task.totalSize = totalSize
+      task.subFiles = subFiles
+      task.totalCount = files.length
+      task.status = 'waiting' // 切换为等待下载状态
+      task.fetchedCount = files.length
+    }
+  }
+
+  // 设置文件夹获取失败
+  function setFolderFetchError(taskId: string, error: string) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task && task.isFolder) {
+      task.status = 'error'
+      task.fetchError = error
+      task.error = error
+    }
+  }
+
+  // 标记文件夹获取完成但没有文件
+  function setFolderEmpty(taskId: string) {
+    const task = downloadTasks.value.find(t => t.id === taskId)
+    if (task && task.isFolder) {
+      task.status = 'error'
+      task.fetchError = '文件夹内没有可下载的文件'
+      task.error = '文件夹内没有可下载的文件'
+    }
+  }
+
   // 从下载列表移除任务
   function removeFromDownload(taskIds: string[]) {
     downloadTasks.value = downloadTasks.value.filter(t => !taskIds.includes(t.id))
@@ -644,6 +736,11 @@ export const useDownloadStore = defineStore('download', () => {
     setSessionData,
     addToDownload,
     addFolderToDownload,
+    createFolderPlaceholder,
+    updateFolderFetchProgress,
+    setFolderFiles,
+    setFolderFetchError,
+    setFolderEmpty,
     removeFromDownload,
     moveToCompleted,
     updateTaskStatus,

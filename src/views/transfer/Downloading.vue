@@ -111,6 +111,17 @@
                   <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
                 </svg>
               </button>
+              <!-- 获取文件列表中 - 显示取消按钮图标 -->
+              <button
+                v-if="task.status === 'fetching'"
+                class="icon-btn"
+                @click="cancelFetching(task.id)"
+                title="取消"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
               <!-- 已暂停/异常 - 显示开始按钮 -->
               <button
                 v-if="task.status === 'paused' || task.status === 'error'"
@@ -145,8 +156,20 @@
           </template>
         </div>
         <div class="col-status">
+          <!-- 获取文件列表中 - 显示加载动画和已获取数量 -->
+          <template v-if="task.status === 'fetching'">
+            <div class="status-fetching">
+              <div class="fetching-spinner"></div>
+              <span class="fetching-text">
+                正在获取文件列表...
+                <span v-if="task.fetchedCount && task.fetchedCount > 0" class="fetched-count">
+                  已加载 {{ task.fetchedCount }} 个文件
+                </span>
+              </span>
+            </div>
+          </template>
           <!-- 下载中/已暂停且有进度 - 显示进度信息 -->
-          <template v-if="task.status === 'downloading' || (task.status === 'paused' && task.progress > 0)">
+          <template v-else-if="task.status === 'downloading' || (task.status === 'paused' && task.progress > 0)">
             <div class="status-progress">
               <div class="progress-info">
                 <!-- 文件夹显示剩余数量，普通文件显示百分比 -->
@@ -207,9 +230,9 @@ const isIndeterminate = computed(() => {
   return selectedIds.value.size > 0 && selectedIds.value.size < tasks.value.length
 })
 
-// 是否有可暂停的任务（非暂停、非异常状态的任务）
+// 是否有可暂停的任务（非暂停、非异常、非获取中状态的任务）
 const canPauseAll = computed(() => {
-  return tasks.value.some(t => t.status !== 'paused' && t.status !== 'error')
+  return tasks.value.some(t => t.status !== 'paused' && t.status !== 'error' && t.status !== 'fetching')
 })
 
 // 是否有可开始的任务（暂停或异常状态的任务）
@@ -236,6 +259,7 @@ function toggleSelect(id: string) {
 function getStatusText(status: TaskStatus): string {
   const statusMap: Record<TaskStatus, string> = {
     waiting: '等待中',
+    fetching: '获取文件列表',
     processing: '处理中',
     creating: '创建文件中',
     downloading: '下载中',
@@ -280,11 +304,26 @@ function resumeTask(id: string) {
   }
 }
 
+// 取消获取文件列表
+function cancelFetching(id: string) {
+  const task = tasks.value.find(t => t.id === id)
+  if (task && task.status === 'fetching') {
+    task.error = '已取消'
+    downloadStore.moveToCompleted(task, false)
+  }
+  selectedIds.value.delete(id)
+}
+
 async function deleteTask(id: string) {
   const task = tasks.value.find(t => t.id === id)
   if (task) {
+    // 如果正在获取文件列表，直接取消
+    if (task.status === 'fetching') {
+      task.error = '已取消'
+      downloadStore.moveToCompleted(task, false)
+    }
     // 如果正在下载，先取消
-    if (task.status === 'downloading' || task.status === 'paused') {
+    else if (task.status === 'downloading' || task.status === 'paused') {
       try {
         await window.electronAPI?.cancelDownload(id)
       } catch (e) {
@@ -563,6 +602,7 @@ onMounted(() => {
   font-size: 13px;
 
   &.waiting { color: $text-secondary; }
+  &.fetching { color: #ff9800; }
   &.processing { color: $primary-color; }
   &.creating { color: $primary-color; }
   &.paused { color: $primary-color; }
@@ -571,6 +611,41 @@ onMounted(() => {
   .error-text {
     color: $danger-color;
   }
+}
+
+// 获取文件列表状态
+.status-fetching {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fetching-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffcc80;
+  border-top-color: #ff9800;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fetching-text {
+  font-size: 13px;
+  color: #ff9800;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fetched-count {
+  font-size: 12px;
+  color: $text-secondary;
 }
 
 .empty-state {

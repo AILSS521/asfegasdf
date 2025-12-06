@@ -624,56 +624,66 @@ function downloadSingle(file: FileItem) {
   downloadManager.startDownload()
 }
 
-// 下载文件夹（作为整体任务）
-async function downloadFolder(folder: FileItem) {
-  // 获取文件夹内所有文件（递归）
+// 下载文件夹（作为整体任务）- 立即加入下载列表，异步获取文件
+function downloadFolder(folder: FileItem) {
+  // 以被下载文件夹的父目录为基础路径，这样下载目录中会创建文件夹本身
+  const folderParentPath = folder.path.substring(0, folder.path.lastIndexOf('/')) || '/'
+
+  // 立即创建文件夹占位任务
+  const taskId = downloadStore.createFolderPlaceholder(folder, folderParentPath)
+  if (!taskId) return // 已在队列中
+
+  // 异步获取文件列表
+  fetchFolderFilesAsync(taskId, folder.path)
+
+  // 启动下载管理器（处理其他等待中的任务）
+  downloadManager.startDownload()
+}
+
+// 异步获取文件夹内所有文件
+async function fetchFolderFilesAsync(taskId: string, folderPath: string) {
   try {
-    loading.value = true
-    const allFiles = await getAllFilesInFolder(folder.path)
-    if (allFiles.length > 0) {
-      // 以被下载文件夹的父目录为基础路径，这样下载目录中会创建文件夹本身
-      // 例如：点击下载 /网盘/A 文件夹，basePath 设为 /网盘
-      // 文件 /网盘/A/B/1.txt 的相对路径就是 A/B/1.txt
-      const folderParentPath = folder.path.substring(0, folder.path.lastIndexOf('/')) || '/'
-      // 添加文件夹任务（作为整体显示）
-      downloadStore.addFolderToDownload(folder, allFiles, folderParentPath)
-      downloadManager.startDownload()
+    const files: FileItem[] = []
+    await getAllFilesInFolderWithProgress(folderPath, files, (count) => {
+      downloadStore.updateFolderFetchProgress(taskId, count)
+    })
+
+    if (files.length > 0) {
+      // 设置文件列表，状态切换为 waiting
+      downloadStore.setFolderFiles(taskId, files)
+      // 触发下载队列处理
+      downloadManager.processQueue()
     } else {
-      errorMessage.value = '文件夹内没有可下载的文件'
-      setTimeout(() => {
-        errorMessage.value = ''
-      }, 3000)
+      // 文件夹为空
+      downloadStore.setFolderEmpty(taskId)
     }
   } catch (error: any) {
-    errorMessage.value = error.message || '获取文件夹内容失败'
-    setTimeout(() => {
-      errorMessage.value = ''
-    }, 3000)
-  } finally {
-    loading.value = false
+    downloadStore.setFolderFetchError(taskId, error.message || '获取文件夹内容失败')
   }
 }
 
-// 递归获取文件夹内所有文件
-async function getAllFilesInFolder(folderPath: string): Promise<FileItem[]> {
+// 递归获取文件夹内所有文件（带进度回调）
+async function getAllFilesInFolderWithProgress(
+  folderPath: string,
+  files: FileItem[],
+  onProgress: (count: number) => void
+): Promise<void> {
   const data = await api.getFileList(code.value.trim(), folderPath)
-  const files: FileItem[] = []
 
   for (const item of data.files) {
     if (item.type === 'folder') {
       // 递归获取子文件夹内的文件
-      const subFiles = await getAllFilesInFolder(item.path)
-      files.push(...subFiles)
+      await getAllFilesInFolderWithProgress(item.path, files, onProgress)
     } else {
       files.push(item)
+      // 每获取一个文件就更新进度
+      onProgress(files.length)
     }
   }
-
-  return files
 }
 
 // 下载选中的文件和文件夹
-async function downloadSelected() {
+function downloadSelected() {
   const selectedItems = fileList.value.filter(f => selectedIds.value.has(f.id))
   if (selectedItems.length === 0) return
 
@@ -688,24 +698,13 @@ async function downloadSelected() {
     downloadStore.addToDownload(files, downloadBasePath)
   }
 
-  // 处理文件夹（需要异步获取内部文件）
-  if (folders.length > 0) {
-    loading.value = true
-    try {
-      for (const folder of folders) {
-        const allFiles = await getAllFilesInFolder(folder.path)
-        if (allFiles.length > 0) {
-          const folderParentPath = folder.path.substring(0, folder.path.lastIndexOf('/')) || '/'
-          downloadStore.addFolderToDownload(folder, allFiles, folderParentPath)
-        }
-      }
-    } catch (error: any) {
-      errorMessage.value = error.message || '获取文件夹内容失败'
-      setTimeout(() => {
-        errorMessage.value = ''
-      }, 3000)
-    } finally {
-      loading.value = false
+  // 处理文件夹（立即创建占位，异步获取文件）
+  for (const folder of folders) {
+    const folderParentPath = folder.path.substring(0, folder.path.lastIndexOf('/')) || '/'
+    const taskId = downloadStore.createFolderPlaceholder(folder, folderParentPath)
+    if (taskId) {
+      // 异步获取文件列表
+      fetchFolderFilesAsync(taskId, folder.path)
     }
   }
 
