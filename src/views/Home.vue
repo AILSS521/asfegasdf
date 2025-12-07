@@ -653,24 +653,6 @@ async function downloadFolder(folder: FileItem) {
   }
 }
 
-// 递归获取文件夹内所有文件
-async function getAllFilesInFolder(folderPath: string): Promise<FileItem[]> {
-  const data = await api.getFileList(code.value.trim(), folderPath)
-  const files: FileItem[] = []
-
-  for (const item of data.files) {
-    if (item.type === 'folder') {
-      // 递归获取子文件夹内的文件
-      const subFiles = await getAllFilesInFolder(item.path)
-      files.push(...subFiles)
-    } else {
-      files.push(item)
-    }
-  }
-
-  return files
-}
-
 // 递归获取文件夹内所有文件（带进度更新）
 async function getAllFilesInFolderWithProgress(folderPath: string, taskId: string): Promise<FileItem[]> {
   const allFiles: FileItem[] = []
