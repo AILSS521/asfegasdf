@@ -367,13 +367,37 @@ export const useDownloadStore = defineStore('download', () => {
     })
   }
 
+  // 清理任务的 aria2 记录（包括文件夹子文件）
+  function cleanupTaskAria2Records(task: DownloadTask) {
+    if (task.isFolder && task.subFiles) {
+      // 文件夹任务：清理所有子文件的记录
+      task.subFiles.forEach((_, index) => {
+        const subFileDownloadId = `${task.id}-sub-${index}`
+        window.electronAPI?.cleanupDownload(subFileDownloadId)
+      })
+    } else {
+      // 单文件任务
+      window.electronAPI?.cleanupDownload(task.id)
+    }
+  }
+
   // 清空已完成
   function clearCompleted() {
+    // 清理所有任务的 aria2 记录
+    completedTasks.value.forEach(task => {
+      cleanupTaskAria2Records(task)
+    })
     completedTasks.value = []
   }
 
   // 移除已完成的任务
   function removeCompleted(taskIds: string[]) {
+    // 清理被删除任务的 aria2 记录
+    completedTasks.value.forEach(task => {
+      if (taskIds.includes(task.id)) {
+        cleanupTaskAria2Records(task)
+      }
+    })
     completedTasks.value = completedTasks.value.filter(t => !taskIds.includes(t.id))
   }
 
@@ -478,11 +502,21 @@ export const useDownloadStore = defineStore('download', () => {
 
   // 移除失败任务
   function removeFromFailed(taskIds: string[]) {
+    // 清理被删除任务的 aria2 记录
+    failedTasks.value.forEach(task => {
+      if (taskIds.includes(task.id)) {
+        cleanupTaskAria2Records(task)
+      }
+    })
     failedTasks.value = failedTasks.value.filter(t => !taskIds.includes(t.id))
   }
 
   // 清空失败列表
   function clearFailed() {
+    // 清理所有任务的 aria2 记录
+    failedTasks.value.forEach(task => {
+      cleanupTaskAria2Records(task)
+    })
     failedTasks.value = []
   }
 

@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pauseDownload: (taskId: string) => ipcRenderer.invoke('download:pause', taskId),
   resumeDownload: (taskId: string) => ipcRenderer.invoke('download:resume', taskId),
   cancelDownload: (taskId: string) => ipcRenderer.invoke('download:cancel', taskId),
+  cleanupDownload: (taskId: string) => ipcRenderer.invoke('download:cleanup', taskId),
 
   // 下载进度监听
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => {

@@ -430,6 +430,20 @@ export class Aria2Client extends EventEmitter {
     }
   }
 
+  // 清理已完成/失败的下载记录（从 aria2 的 stopped 队列中移除）
+  async cleanupDownloadResult(taskId: string): Promise<void> {
+    const gid = this.taskMap.get(taskId)
+    if (gid) {
+      try {
+        await this.sendRequest('removeDownloadResult', [gid])
+      } catch {
+        // 忽略错误，记录可能已不存在
+      }
+      this.taskMap.delete(taskId)
+      this.gidMap.delete(gid)
+    }
+  }
+
   // 获取任务状态
   async tellStatus(taskId: string): Promise<Aria2TaskStatus | null> {
     const gid = this.taskMap.get(taskId)

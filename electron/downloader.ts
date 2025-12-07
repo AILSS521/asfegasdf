@@ -73,6 +73,11 @@ export class DownloadManager {
     await aria2Client.forceRemove(taskId)
   }
 
+  // 清理已完成/失败的下载记录
+  async cleanupTask(taskId: string): Promise<void> {
+    await aria2Client.cleanupDownloadResult(taskId)
+  }
+
   // 获取任务状态
   async getTaskStatus(taskId: string) {
     return await aria2Client.tellStatus(taskId)

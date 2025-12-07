@@ -502,6 +502,17 @@ ipcMain.handle('download:cancel', async (_, taskId: string) => {
   }
 })
 
+// 清理已完成/失败的下载记录
+ipcMain.handle('download:cleanup', async (_, taskId: string) => {
+  try {
+    await downloadManager.cleanupTask(taskId)
+    return { success: true }
+  } catch (error: any) {
+    console.error('清理下载记录失败:', error)
+    return { success: false, error: error.message }
+  }
+})
+
 // IPC处理 - 下载线路
 ipcMain.handle('route:selectBest', async () => {
   try {

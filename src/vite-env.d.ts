@@ -62,6 +62,7 @@ interface ElectronAPI {
   pauseDownload: (taskId: string) => Promise<{ success: boolean }>
   resumeDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
   cancelDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
+  cleanupDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
 
   // 下载进度监听
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => void

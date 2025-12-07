@@ -68,6 +68,8 @@ export function useDownloadManager() {
             progress.downloadedSize
           )
         } else if (progress.status === 'completed') {
+          // 清理 aria2 记录
+          window.electronAPI?.cleanupDownload(progress.taskId)
           downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, true)
           folderDownloadMap.value.delete(progress.taskId)
           // 完成后尝试启动下一个子文件
@@ -87,6 +89,8 @@ export function useDownloadManager() {
           // 处理队列中的其他任务（释放了一个并发位置）
           processQueue()
         } else if (progress.status === 'error') {
+          // 清理 aria2 记录
+          window.electronAPI?.cleanupDownload(progress.taskId)
           folderDownloadMap.value.delete(progress.taskId)
           // 标记子文件失败，整个文件夹停止
           const folderStopped = downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, false, progress.error || '下载失败')
@@ -121,9 +125,13 @@ export function useDownloadManager() {
             progress.downloadedSize
           )
         } else if (progress.status === 'completed') {
+          // 清理 aria2 记录
+          window.electronAPI?.cleanupDownload(progress.taskId)
           downloadStore.moveToCompleted(task, true)
           processQueue()
         } else if (progress.status === 'error') {
+          // 清理 aria2 记录
+          window.electronAPI?.cleanupDownload(progress.taskId)
           task.error = progress.error || '下载失败'
           downloadStore.moveToCompleted(task, false)
           processQueue()
