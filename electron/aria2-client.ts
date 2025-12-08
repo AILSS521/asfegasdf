@@ -67,8 +67,24 @@ export class Aria2Client extends EventEmitter {
   private wsReconnectTimer: NodeJS.Timeout | null = null
   private pendingRequests: Map<string, { resolve: (value: any) => void; reject: (reason: any) => void }> = new Map()
 
+  // 调试日志回调
+  private debugLogCallback: ((message: string) => void) | null = null
+
   constructor() {
     super()
+  }
+
+  // 设置调试日志回调
+  setDebugLogCallback(callback: (message: string) => void) {
+    this.debugLogCallback = callback
+  }
+
+  // 写调试日志
+  private debugLog(message: string) {
+    console.log(message)
+    if (this.debugLogCallback) {
+      this.debugLogCallback(message)
+    }
   }
 
   // 生成随机端口
@@ -652,15 +668,15 @@ export class Aria2Client extends EventEmitter {
   // 获取任务状态
   async tellStatus(taskId: string): Promise<Aria2TaskStatus | null> {
     const gid = this.taskMap.get(taskId)
-    console.log(`[aria2] tellStatus called: taskId=${taskId}, gid=${gid}, taskMapSize=${this.taskMap.size}`)
+    this.debugLog(`[aria2] tellStatus: taskId=${taskId}, gid=${gid || 'null'}, taskMapSize=${this.taskMap.size}`)
     if (!gid) {
-      console.log(`[aria2] tellStatus: 没有找到 gid，taskMap 内容:`, Array.from(this.taskMap.entries()))
+      this.debugLog(`[aria2] tellStatus: 没有找到 gid，taskMap keys: ${Array.from(this.taskMap.keys()).join(', ')}`)
       return null
     }
 
     try {
       const result = await this.sendRequest('tellStatus', [gid])
-      console.log(`[aria2] tellStatus 结果: taskId=${taskId}, status=${result.status}`)
+      this.debugLog(`[aria2] tellStatus 结果: taskId=${taskId}, status=${result.status}`)
       return {
         gid: result.gid,
         status: result.status,
@@ -672,7 +688,7 @@ export class Aria2Client extends EventEmitter {
         files: result.files
       }
     } catch (e) {
-      console.log(`[aria2] tellStatus 异常: taskId=${taskId}, error=${e}`)
+      this.debugLog(`[aria2] tellStatus 异常: taskId=${taskId}, error=${e}`)
       return null
     }
   }

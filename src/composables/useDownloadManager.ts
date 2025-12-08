@@ -8,31 +8,15 @@ import path from 'path-browserify'
 const MAX_RETRY = 3
 const RETRY_DELAY = 5000
 
-// 调试日志函数
-const debugLogs: string[] = []
+// 调试日志函数 - 写入到文件
 function debugLog(message: string, data?: any) {
   const timestamp = new Date().toISOString()
   const logEntry = data
-    ? `[${timestamp}] ${message}: ${JSON.stringify(data, null, 2)}`
+    ? `[${timestamp}] ${message}: ${JSON.stringify(data)}`
     : `[${timestamp}] ${message}`
-  debugLogs.push(logEntry)
   console.log('[DownloadManager]', logEntry)
-  // 保存到本地存储，方便查看
-  try {
-    localStorage.setItem('downloadManagerLogs', debugLogs.slice(-200).join('\n'))
-  } catch (e) {
-    // ignore
-  }
-}
-
-// 导出日志供外部查看
-export function getDownloadManagerLogs(): string[] {
-  return debugLogs
-}
-
-export function clearDownloadManagerLogs() {
-  debugLogs.length = 0
-  localStorage.removeItem('downloadManagerLogs')
+  // 写入到文件
+  window.electronAPI?.writeDebugLog(logEntry)
 }
 
 // 获取用于API请求的目录路径

@@ -10,6 +10,40 @@ import { aria2Client } from './aria2-client'
 let mainWindow: BrowserWindow | null = null
 let splashWindow: BrowserWindow | null = null
 
+// 调试日志文件路径
+let debugLogPath: string | null = null
+let debugLogStream: fs.WriteStream | null = null
+
+// 初始化调试日志
+function initDebugLog() {
+  const logDir = app.isPackaged
+    ? path.join(path.dirname(app.getPath('exe')), 'log')
+    : path.join(__dirname, '..', 'log')
+
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true })
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19)
+  debugLogPath = path.join(logDir, `debug-${timestamp}.log`)
+  debugLogStream = fs.createWriteStream(debugLogPath, { flags: 'a' })
+
+  console.log(`[Debug] 日志文件: ${debugLogPath}`)
+
+  // 设置 aria2Client 的日志回调
+  aria2Client.setDebugLogCallback((message) => {
+    writeDebugLog(message)
+  })
+}
+
+// 写入调试日志
+function writeDebugLog(message: string) {
+  if (debugLogStream) {
+    debugLogStream.write(message + '\n')
+  }
+  console.log('[Debug]', message)
+}
+
 // 当前客户端版本
 const CLIENT_VERSION = '1.0.9'
 // 版本检查API地址
@@ -518,11 +552,18 @@ ipcMain.handle('download:cleanup', async (_, taskId: string) => {
 ipcMain.handle('download:getStatus', async (_, taskId: string) => {
   try {
     const status = await downloadManager.getTaskStatus(taskId)
+    writeDebugLog(`[Main] getStatus: taskId=${taskId}, status=${status?.status || 'null'}`)
     return { success: true, status }
   } catch (error: any) {
+    writeDebugLog(`[Main] getStatus error: taskId=${taskId}, error=${error.message}`)
     // 任务不存在返回 null
     return { success: true, status: null }
   }
+})
+
+// 写入调试日志（渲染进程调用）
+ipcMain.handle('debug:writeLog', async (_, message: string) => {
+  writeDebugLog(`[Renderer] ${message}`)
 })
 
 // IPC处理 - 下载线路
@@ -643,6 +684,7 @@ if (!gotTheLock) {
 
   // 应用生命周期
   app.whenReady().then(() => {
+    initDebugLog()
     createSplashWindow()
   })
 }

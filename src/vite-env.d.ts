@@ -76,6 +76,9 @@ interface ElectronAPI {
   cleanupDownload: (taskId: string) => Promise<{ success: boolean; error?: string }>
   getDownloadStatus: (taskId: string) => Promise<{ success: boolean; status: Aria2TaskStatus | null }>
 
+  // 写入调试日志到文件
+  writeDebugLog: (message: string) => Promise<void>
+
   // 下载进度监听
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => void
   removeDownloadProgressListener: () => void

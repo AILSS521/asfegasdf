@@ -53,6 +53,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cleanupDownload: (taskId: string) => ipcRenderer.invoke('download:cleanup', taskId),
   getDownloadStatus: (taskId: string) => ipcRenderer.invoke('download:getStatus', taskId),
 
+  // 写入调试日志到文件
+  writeDebugLog: (message: string) => ipcRenderer.invoke('debug:writeLog', message),
+
   // 下载进度监听
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => {
     ipcRenderer.on('download:progress', (_, progress) => callback(progress))
