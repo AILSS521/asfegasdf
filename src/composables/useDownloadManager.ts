@@ -36,6 +36,10 @@ function getApiPath(filePath: string, basePath: string): string {
 // 用于跟踪文件夹任务中当前正在下载的子文件
 const folderDownloadMap = ref<Map<string, { taskId: string; fileIndex: number }>>(new Map())
 
+// 同步锁：用于防止 startSubFileDownload 的竞态条件
+// 这个Set在检查的同一时刻就加锁，不用等到后面设置状态
+const subFileProcessingLock = new Set<string>()
+
 // 是否有任务正在获取下载链接（限制同时只能有一个）
 const isFetchingLink = ref(false)
 
@@ -94,10 +98,11 @@ export function useDownloadManager() {
             folderTaskId: folderInfo.taskId,
             fileIndex: folderInfo.fileIndex
           })
-          // 清理 aria2 记录
+          // 清理 aria2 记录、映射和同步锁
           window.electronAPI?.cleanupDownload(progress.taskId)
           downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, true)
           folderDownloadMap.value.delete(progress.taskId)
+          subFileProcessingLock.delete(progress.taskId)
           // 完成后尝试启动下一个子文件
           if (task.status !== 'paused' && task.status !== 'error') {
             // 检查是否所有文件都完成了
@@ -121,9 +126,10 @@ export function useDownloadManager() {
             folderTaskId: folderInfo.taskId,
             fileIndex: folderInfo.fileIndex
           })
-          // 清理 aria2 记录
+          // 清理 aria2 记录、映射和同步锁
           window.electronAPI?.cleanupDownload(progress.taskId)
           folderDownloadMap.value.delete(progress.taskId)
+          subFileProcessingLock.delete(progress.taskId)
           // 标记子文件失败，整个文件夹停止
           const folderStopped = downloadStore.markFolderSubFileCompleted(folderInfo.taskId, folderInfo.fileIndex, false, progress.error || '下载失败')
           if (folderStopped) {
@@ -145,13 +151,15 @@ export function useDownloadManager() {
                 subFile.status = 'paused'
               }
             }
-            // 清理该子文件的映射，释放并发位置
+            // 清理该子文件的映射和同步锁，释放并发位置
             folderDownloadMap.value.delete(progress.taskId)
+            subFileProcessingLock.delete(progress.taskId)
             // 暂停后处理等待队列
             processQueue()
           } else {
-            // 任务已恢复，但收到了延迟的暂停回调，清理旧映射即可
+            // 任务已恢复，但收到了延迟的暂停回调，清理旧映射和同步锁即可
             folderDownloadMap.value.delete(progress.taskId)
+            subFileProcessingLock.delete(progress.taskId)
           }
         }
       } else {
@@ -469,6 +477,18 @@ export function useDownloadManager() {
 
   // 启动单个子文件下载
   async function startSubFileDownload(task: DownloadTask, index: number, subFile: SubFileTask) {
+    // 生成子文件的下载 ID（放在最前面，用于同步锁）
+    const subFileDownloadId = `${task.id}-sub-${index}`
+
+    // 【关键】同步锁检查 - 必须在任何 await 之前执行
+    // 使用原子操作：检查 + 加锁在同一个同步代码块中
+    if (subFileProcessingLock.has(subFileDownloadId)) {
+      debugLog('startSubFileDownload: 同步锁命中，跳过重复调用', { subFileDownloadId })
+      return
+    }
+    // 立即加锁，阻止后续并行调用
+    subFileProcessingLock.add(subFileDownloadId)
+
     debugLog('startSubFileDownload 开始', {
       taskId: task.id,
       index,
@@ -478,28 +498,32 @@ export function useDownloadManager() {
       hasLocalPath: !!subFile.localPath
     })
 
-    if (!task.isFolder || !task.subFiles) return
+    if (!task.isFolder || !task.subFiles) {
+      subFileProcessingLock.delete(subFileDownloadId)
+      return
+    }
 
     // 检查任务是否还在下载列表中
     const currentTask = downloadStore.downloadTasks.find(t => t.id === task.id)
     if (!currentTask) {
       debugLog('startSubFileDownload: 任务不在下载列表中，退出')
+      subFileProcessingLock.delete(subFileDownloadId)
       return
     }
 
     // 检查任务是否被暂停或已失败
     if (currentTask.status === 'paused' || currentTask.status === 'error') {
       debugLog('startSubFileDownload: 任务已暂停或失败，退出', { status: currentTask.status })
+      subFileProcessingLock.delete(subFileDownloadId)
       return
     }
 
-    // 生成子文件的下载 ID
-    const subFileDownloadId = `${task.id}-sub-${index}`
     debugLog('生成子文件下载ID', { subFileDownloadId })
 
-    // 立即检查是否已经在处理这个子文件，防止重复调用
+    // 检查是否已经在 folderDownloadMap 中（双重保险）
     if (folderDownloadMap.value.has(subFileDownloadId)) {
       debugLog('startSubFileDownload: 子文件已在下载中，跳过', { subFileDownloadId })
+      subFileProcessingLock.delete(subFileDownloadId)
       return
     }
 
@@ -509,10 +533,11 @@ export function useDownloadManager() {
       debugLog('startSubFileDownload: 子文件状态不是 waiting，跳过', {
         status: currentSubFile?.status
       })
+      subFileProcessingLock.delete(subFileDownloadId)
       return
     }
 
-    // 立即标记为处理中并注册映射，防止被重复调用
+    // 立即标记为处理中并注册映射
     downloadStore.updateFolderSubFileStatus(task.id, index, 'processing')
     folderDownloadMap.value.set(subFileDownloadId, { taskId: task.id, fileIndex: index })
 
@@ -537,8 +562,9 @@ export function useDownloadManager() {
 
         if (aria2Status === 'complete') {
           debugLog('aria2 显示已完成，直接标记成功')
-          // 清理映射
+          // 清理映射和同步锁
           folderDownloadMap.value.delete(subFileDownloadId)
+          subFileProcessingLock.delete(subFileDownloadId)
           // aria2 显示已完成，直接标记成功
           downloadStore.markFolderSubFileCompleted(task.id, index, true)
           // 检查文件夹是否全部完成
@@ -568,8 +594,9 @@ export function useDownloadManager() {
 
         if (fileCheckResult?.exists && fileCheckResult?.sizeMatch) {
           debugLog('文件已存在且大小匹配，直接标记为完成')
-          // 文件已完成，直接标记成功
+          // 文件已完成，直接标记成功，清理映射和同步锁
           folderDownloadMap.value.delete(subFileDownloadId)
+          subFileProcessingLock.delete(subFileDownloadId)
           downloadStore.markFolderSubFileCompleted(task.id, index, true)
           // 检查文件夹是否全部完成
           if (currentTask.subFiles) {
@@ -608,9 +635,10 @@ export function useDownloadManager() {
 
         if (fileCheckBeforeResume?.exists && fileCheckBeforeResume?.sizeMatch) {
           debugLog('文件已存在且大小匹配，直接标记为完成，不恢复下载')
-          // 清理 aria2 记录
+          // 清理 aria2 记录、映射和同步锁
           await window.electronAPI?.cleanupDownload(subFileDownloadId)
           folderDownloadMap.value.delete(subFileDownloadId)
+          subFileProcessingLock.delete(subFileDownloadId)
           downloadStore.markFolderSubFileCompleted(task.id, index, true)
           // 检查文件夹是否全部完成
           if (currentTask.subFiles) {
@@ -643,8 +671,9 @@ export function useDownloadManager() {
     // 使用任务自身的会话数据，避免被新下载编码覆盖
     const session = task.sessionData
     if (!session) {
-      // 清理映射
+      // 清理映射和同步锁
       folderDownloadMap.value.delete(subFileDownloadId)
+      subFileProcessingLock.delete(subFileDownloadId)
       downloadStore.markFolderSubFileCompleted(task.id, index, false, '会话数据丢失，请重新添加下载任务')
       processQueue()
       return
@@ -654,8 +683,9 @@ export function useDownloadManager() {
       // 再次检查任务状态（异步操作前）
       const taskBeforeApi = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskBeforeApi || taskBeforeApi.status === 'paused' || taskBeforeApi.status === 'error') {
-        // 清理映射并恢复子文件状态，以便下次恢复时能找到
+        // 清理映射、同步锁并恢复子文件状态，以便下次恢复时能找到
         folderDownloadMap.value.delete(subFileDownloadId)
+        subFileProcessingLock.delete(subFileDownloadId)
         downloadStore.updateFolderSubFileStatus(task.id, index, 'waiting')
         return
       }
@@ -674,8 +704,9 @@ export function useDownloadManager() {
       // 获取链接后再次检查任务状态
       const taskAfterApi = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskAfterApi || taskAfterApi.status === 'paused' || taskAfterApi.status === 'error') {
-        // 清理映射并恢复子文件状态，以便下次恢复时能找到
+        // 清理映射、同步锁并恢复子文件状态，以便下次恢复时能找到
         folderDownloadMap.value.delete(subFileDownloadId)
+        subFileProcessingLock.delete(subFileDownloadId)
         downloadStore.updateFolderSubFileStatus(task.id, index, 'waiting')
         return
       }
@@ -721,8 +752,9 @@ export function useDownloadManager() {
       subFile.retryCount++
 
       if (subFile.retryCount >= MAX_RETRY) {
-        // 清理映射
+        // 清理映射和同步锁
         folderDownloadMap.value.delete(subFileDownloadId)
+        subFileProcessingLock.delete(subFileDownloadId)
         // 标记子文件失败，整个文件夹停止
         const folderStopped = downloadStore.markFolderSubFileCompleted(task.id, index, false, error.message || '获取下载链接失败')
         errorCount.value++
@@ -732,8 +764,9 @@ export function useDownloadManager() {
           processQueue()
         }
       } else {
-        // 清理映射并等待后重试当前文件
+        // 清理映射和同步锁，等待后重试当前文件
         folderDownloadMap.value.delete(subFileDownloadId)
+        subFileProcessingLock.delete(subFileDownloadId)
         setTimeout(() => {
           const stillExists = downloadStore.downloadTasks.find(t => t.id === task.id)
           if (stillExists && stillExists.status !== 'paused' && stillExists.status !== 'error') {
@@ -770,7 +803,7 @@ export function useDownloadManager() {
     errorCount.value = 0
   }
 
-  // 清理文件夹任务的下载映射（删除任务时调用）
+  // 清理文件夹任务的下载映射和同步锁（删除任务时调用）
   function cleanupFolderDownloadMap(taskId: string) {
     const toDelete: string[] = []
     folderDownloadMap.value.forEach((info, downloadId) => {
@@ -780,6 +813,7 @@ export function useDownloadManager() {
     })
     toDelete.forEach(downloadId => {
       folderDownloadMap.value.delete(downloadId)
+      subFileProcessingLock.delete(downloadId)
     })
   }
 
