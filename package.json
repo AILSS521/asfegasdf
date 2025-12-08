@@ -1,6 +1,6 @@
 {
   "name": "image-downloader",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "图片下载器",
   "main": "dist-electron/main.js",
   "scripts": {

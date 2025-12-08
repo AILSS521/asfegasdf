@@ -46,7 +46,7 @@
       <h3 class="section-title">关于</h3>
       <div class="about-info">
         <div class="app-name">图片下载器</div>
-        <div class="app-version">v1.0.9</div>
+        <div class="app-version">v1.1.0</div>
       </div>
     </div>
   </div>
