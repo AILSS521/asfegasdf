@@ -493,13 +493,32 @@ export function useDownloadManager() {
       return
     }
 
-    // 更新当前正在下载的文件名（显示最新启动的）
-    task.currentFileName = subFile.file.name
-    task.currentFileIndex = index
-
     // 生成子文件的下载 ID
     const subFileDownloadId = `${task.id}-sub-${index}`
     debugLog('生成子文件下载ID', { subFileDownloadId })
+
+    // 立即检查是否已经在处理这个子文件，防止重复调用
+    if (folderDownloadMap.value.has(subFileDownloadId)) {
+      debugLog('startSubFileDownload: 子文件已在下载中，跳过', { subFileDownloadId })
+      return
+    }
+
+    // 检查子文件状态，只处理 waiting 状态的
+    const currentSubFile = currentTask.subFiles?.[index]
+    if (!currentSubFile || currentSubFile.status !== 'waiting') {
+      debugLog('startSubFileDownload: 子文件状态不是 waiting，跳过', {
+        status: currentSubFile?.status
+      })
+      return
+    }
+
+    // 立即标记为处理中并注册映射，防止被重复调用
+    downloadStore.updateFolderSubFileStatus(task.id, index, 'processing')
+    folderDownloadMap.value.set(subFileDownloadId, { taskId: task.id, fileIndex: index })
+
+    // 更新当前正在下载的文件名（显示最新启动的）
+    task.currentFileName = subFile.file.name
+    task.currentFileIndex = index
 
     // 如果子文件已经有下载链接（暂停后恢复的情况），先检查 aria2 任务状态
     if (subFile.downloadUrl && subFile.localPath) {
@@ -518,6 +537,8 @@ export function useDownloadManager() {
 
         if (aria2Status === 'complete') {
           debugLog('aria2 显示已完成，直接标记成功')
+          // 清理映射
+          folderDownloadMap.value.delete(subFileDownloadId)
           // aria2 显示已完成，直接标记成功
           downloadStore.markFolderSubFileCompleted(task.id, index, true)
           // 检查文件夹是否全部完成
@@ -543,8 +564,6 @@ export function useDownloadManager() {
       if (currentTask.status !== 'downloading') {
         downloadStore.updateTaskStatus(task.id, 'downloading')
       }
-      // 重新注册映射
-      folderDownloadMap.value.set(subFileDownloadId, { taskId: task.id, fileIndex: index })
       // 恢复下载
       const resumeResult = await window.electronAPI?.resumeDownload(subFileDownloadId)
       debugLog('恢复下载结果', resumeResult)
@@ -553,11 +572,11 @@ export function useDownloadManager() {
 
     debugLog('子文件无下载链接，需要获取新链接')
 
-    downloadStore.updateFolderSubFileStatus(task.id, index, 'processing')
-
     // 使用任务自身的会话数据，避免被新下载编码覆盖
     const session = task.sessionData
     if (!session) {
+      // 清理映射
+      folderDownloadMap.value.delete(subFileDownloadId)
       downloadStore.markFolderSubFileCompleted(task.id, index, false, '会话数据丢失，请重新添加下载任务')
       processQueue()
       return
@@ -567,7 +586,8 @@ export function useDownloadManager() {
       // 再次检查任务状态（异步操作前）
       const taskBeforeApi = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskBeforeApi || taskBeforeApi.status === 'paused' || taskBeforeApi.status === 'error') {
-        // 恢复子文件状态，以便下次恢复时能找到
+        // 清理映射并恢复子文件状态，以便下次恢复时能找到
+        folderDownloadMap.value.delete(subFileDownloadId)
         downloadStore.updateFolderSubFileStatus(task.id, index, 'waiting')
         return
       }
@@ -586,7 +606,8 @@ export function useDownloadManager() {
       // 获取链接后再次检查任务状态
       const taskAfterApi = downloadStore.downloadTasks.find(t => t.id === task.id)
       if (!taskAfterApi || taskAfterApi.status === 'paused' || taskAfterApi.status === 'error') {
-        // 恢复子文件状态，以便下次恢复时能找到
+        // 清理映射并恢复子文件状态，以便下次恢复时能找到
+        folderDownloadMap.value.delete(subFileDownloadId)
         downloadStore.updateFolderSubFileStatus(task.id, index, 'waiting')
         return
       }
@@ -612,9 +633,6 @@ export function useDownloadManager() {
       const localPath = path.join(localDir, subFile.file.name)
       subFile.localPath = localPath
 
-      // 记录文件夹下载映射
-      folderDownloadMap.value.set(subFileDownloadId, { taskId: task.id, fileIndex: index })
-
       // 使用内置下载器开始下载
       const result = await window.electronAPI?.startDownload(subFileDownloadId, {
         url: linkData.url,
@@ -635,6 +653,8 @@ export function useDownloadManager() {
       subFile.retryCount++
 
       if (subFile.retryCount >= MAX_RETRY) {
+        // 清理映射
+        folderDownloadMap.value.delete(subFileDownloadId)
         // 标记子文件失败，整个文件夹停止
         const folderStopped = downloadStore.markFolderSubFileCompleted(task.id, index, false, error.message || '获取下载链接失败')
         errorCount.value++
@@ -644,7 +664,8 @@ export function useDownloadManager() {
           processQueue()
         }
       } else {
-        // 等待后重试当前文件
+        // 清理映射并等待后重试当前文件
+        folderDownloadMap.value.delete(subFileDownloadId)
         setTimeout(() => {
           const stillExists = downloadStore.downloadTasks.find(t => t.id === task.id)
           if (stillExists && stillExists.status !== 'paused' && stillExists.status !== 'error') {
